@@ -288,10 +288,10 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex flex-col lg:flex-row gap-4 items-start">
           {/* Left Column: Upload & Preview (Reduced Size) */}
-          <section className="lg:col-span-4 space-y-6">
+          <section className="shrink-0 space-y-6">
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm" style={{ width: '230px', minHeight: '130px', paddingTop: '9px' }}>
               <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 ml-1">Tải ảnh lên</h2>
               
@@ -395,7 +395,7 @@ export default function App() {
           </section>
 
           {/* Right Column: History Table */}
-          <section className="lg:col-span-8 space-y-6">
+          <section className="flex-1 space-y-6 min-w-0">
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm h-full flex flex-col overflow-hidden" style={{ width: '960px' }}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
