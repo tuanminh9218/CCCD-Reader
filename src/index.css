@@ -1,1 +1,19 @@
 @import "tailwindcss";
+
+@layer base {
+  input[type='file'] {
+    @apply bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-medium text-slate-600 transition-all cursor-pointer w-full;
+  }
+  
+  input[type='file']:hover {
+    @apply bg-blue-50 border-blue-300 text-blue-700;
+  }
+  
+  input[type='file']:focus {
+    @apply bg-white border-blue-500 ring-4 ring-blue-100 outline-none;
+  }
+
+  input[type='file']::file-selector-button {
+    @apply bg-blue-600 text-white px-3 py-1.5 rounded-lg border-none cursor-pointer hover:bg-blue-700 transition-all mr-2 font-bold uppercase text-[9px] tracking-wider;
+  }
+}

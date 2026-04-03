@@ -1,5 +1,5 @@
 {
   "name": "Trình Đọc Thông Tin CCCD",
   "description": "Ứng dụng tự động trích xuất thông tin từ ảnh thẻ Căn cước công dân (CCCD) sử dụng AI.",
-  "requestFramePermissions": []
+  "requestFramePermissions": ["camera"]
 }

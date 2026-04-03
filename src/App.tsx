@@ -15,7 +15,8 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
-  Download
+  Download,
+  Camera
 } from 'lucide-react';
 import { CCCDInfo } from './types';
 
@@ -29,46 +30,96 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [duplicateIds, setDuplicateIds] = useState<string[]>([]);
   const [copySuccess, setCopySuccess] = useState<number | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
       Array.from(files).forEach((file: File) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const img = new Image();
-          img.onload = () => {
-            // Resize image to max 1200px width/height for faster processing while maintaining readability
-            const canvas = document.createElement('canvas');
-            let width = img.width;
-            let height = img.height;
-            const maxDim = 1200;
-
-            if (width > height) {
-              if (width > maxDim) {
-                height *= maxDim / width;
-                width = maxDim;
-              }
-            } else {
-              if (height > maxDim) {
-                width *= maxDim / height;
-                height = maxDim;
-              }
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(img, 0, 0, width, height);
-            const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-            setImages(prev => [...prev, resizedDataUrl]);
-            setError(null);
-          };
-          img.src = reader.result as string;
-        };
-        reader.readAsDataURL(file);
+        processFile(file);
       });
+    }
+  };
+
+  const processFile = (file: File | Blob) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const img = new Image();
+      img.onload = () => {
+        // Resize image to max 1200px width/height for faster processing while maintaining readability
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 1200;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height *= maxDim / width;
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width *= maxDim / height;
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        setImages(prev => [...prev, resizedDataUrl]);
+        setError(null);
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const startCamera = async () => {
+    setIsCameraOpen(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Camera error:", err);
+      setError("Không thể truy cập camera. Vui lòng kiểm tra quyền truy cập.");
+      setIsCameraOpen(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraOpen(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      canvas.toBlob((blob) => {
+        if (blob) {
+          processFile(blob);
+          stopCamera();
+        }
+      }, 'image/jpeg', 0.8);
     }
   };
 
@@ -101,13 +152,14 @@ export default function App() {
   const exportToExcel = () => {
     if (results.length === 0) return;
 
-    const headers = ["STT", "Số CCCD", "Ngày cấp", "Họ và tên", "Ngày sinh", "Quê quán", "Nơi thường trú"];
+    const headers = ["STT", "Số CCCD", "Ngày cấp", "Họ và tên", "Ngày sinh", "Giới tính", "Quê quán", "Nơi thường trú"];
     const rows = results.map((item, index) => [
       index + 1,
       item.idNumber,
       item.issueDate,
       item.fullName,
       item.dateOfBirth,
+      item.gender,
       item.hometown,
       item.permanentResidence
     ]);
@@ -123,6 +175,7 @@ export default function App() {
       { wch: 12 }, // Ngày cấp
       { wch: 25 }, // Họ và tên
       { wch: 12 }, // Ngày sinh
+      { wch: 10 }, // Giới tính
       { wch: 30 }, // Quê quán
       { wch: 40 }  // Nơi thường trú
     ];
@@ -163,6 +216,7 @@ export default function App() {
                 - issueDate: Ngày cấp (DD/MM/YYYY).
                 - fullName: Họ tên (IN HOA).
                 - dateOfBirth: Ngày sinh (DD/MM/YYYY).
+                - gender: Giới tính (Nam/Nữ).
                 - hometown: Quê quán.
                 - permanentResidence: Thường trú.`,
               },
@@ -181,10 +235,11 @@ export default function App() {
                 issueDate: { type: Type.STRING },
                 fullName: { type: Type.STRING },
                 dateOfBirth: { type: Type.STRING },
+                gender: { type: Type.STRING },
                 hometown: { type: Type.STRING },
                 permanentResidence: { type: Type.STRING },
               },
-              required: ["idNumber", "issueDate", "fullName", "dateOfBirth", "hometown", "permanentResidence"],
+              required: ["idNumber", "issueDate", "fullName", "dateOfBirth", "gender", "hometown", "permanentResidence"],
             },
           },
         },
@@ -255,7 +310,7 @@ export default function App() {
   };
 
   const formatResultLine = (item: CCCDInfo) => {
-    return `${item.idNumber} (${item.issueDate}) - ${item.fullName} - ${item.dateOfBirth} - ${item.hometown} - ${item.permanentResidence}`;
+    return `${item.idNumber} (${item.issueDate}) - ${item.fullName} - ${item.dateOfBirth} - ${item.gender} - ${item.hometown} - ${item.permanentResidence}`;
   };
 
   const copyToClipboard = async (text: string, index: number) => {
@@ -291,31 +346,35 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-4 items-start">
           {/* Left Column: Upload & Preview (Reduced Size) */}
-          <section className="shrink-0 space-y-6">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm" style={{ width: '230px', minHeight: '130px', paddingTop: '9px' }}>
-              <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 ml-1">Tải ảnh lên</h2>
+          <section className="shrink-0 space-y-2">
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm" style={{ width: '230px', minHeight: '130px', paddingTop: '6px' }}>
+              <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Tải ảnh lên</h2>
               
-              <div className="space-y-3">
-                <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all group"
-                  style={{ width: '200px', height: '80px' }}
-                >
-                  <div className="bg-slate-100 p-2 rounded-full group-hover:bg-blue-100 transition-colors">
-                    <Upload className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
+              <div className="space-y-2">
+                <div className="flex flex-col gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Chọn tệp ảnh</label>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef}
+                      onChange={handleImageUpload}
+                      accept="image/*"
+                      multiple
+                    />
                   </div>
-                  <div className="text-center">
-                    <p className="font-semibold text-slate-700 text-xs">Tải ảnh lên</p>
-                    <p className="text-[9px] text-slate-400 mt-0.5 uppercase font-bold tracking-tight">Chọn nhiều ảnh</p>
+                  
+                  <div 
+                    onClick={startCamera}
+                    className="w-full border-2 border-dashed border-slate-200 rounded-xl p-2 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all group"
+                    style={{ height: '50px' }}
+                  >
+                    <div className="bg-slate-100 p-1 rounded-full group-hover:bg-blue-100 transition-colors">
+                      <Camera className="w-3 h-3 text-slate-400 group-hover:text-blue-600" />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-semibold text-slate-700 text-[9px]">Chụp ảnh từ Camera</p>
+                    </div>
                   </div>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef}
-                    onChange={handleImageUpload}
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                  />
                 </div>
 
                 {images.length > 0 && !loading && (
@@ -323,17 +382,17 @@ export default function App() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     onClick={extractInfo}
-                    className="w-[200px] bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold py-2.5 rounded-xl shadow-md shadow-blue-200 transition-all flex items-center justify-center gap-2 text-sm border border-blue-400/30"
+                    className="w-[200px] bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold py-2 rounded-xl shadow-md shadow-blue-200 transition-all flex items-center justify-center gap-2 text-xs border border-blue-400/30"
                   >
-                    <FileText className="w-4 h-4" />
+                    <FileText className="w-3.5 h-3.5" />
                     Trích xuất ngay
                   </motion.button>
                 )}
 
                 {loading && (
-                  <div className="w-[200px] flex flex-col items-center gap-2 py-2">
-                    <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
-                    <p className="text-[10px] font-bold text-slate-500 animate-pulse uppercase tracking-wider">Đang phân tích...</p>
+                  <div className="w-[200px] flex flex-col items-center gap-1 py-1">
+                    <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                    <p className="text-[9px] font-bold text-slate-500 animate-pulse uppercase tracking-wider">Đang phân tích...</p>
                   </div>
                 )}
 
@@ -341,28 +400,28 @@ export default function App() {
                   <motion.div 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="w-[200px] p-3 bg-red-50 border border-red-100 rounded-xl flex gap-2 text-red-700 text-[10px] font-medium"
+                    className="w-[200px] p-2 bg-red-50 border border-red-100 rounded-xl flex gap-2 text-red-700 text-[9px] font-medium"
                   >
-                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     <p>{error}</p>
                   </motion.div>
                 )}
 
                 {/* Image Previews Grouped by Person (1-2 images) */}
-                <div className="space-y-3 pt-2">
+                <div className="space-y-2 pt-1">
                   <AnimatePresence>
                     {Array.from({ length: Math.ceil(images.length / 2) }).map((_, groupIndex) => (
                       <motion.div 
                         key={groupIndex}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="p-2 border border-blue-100 bg-blue-50/10 rounded-xl space-y-2"
+                        className="p-1.5 border border-blue-100 bg-blue-50/10 rounded-xl space-y-1.5"
                         style={{ width: '200px' }}
                       >
                         <div className="flex items-center justify-between px-1">
-                          <span className="text-[10px] font-bold text-blue-600 uppercase tracking-tighter">NGƯỜI #{groupIndex + 1}</span>
+                          <span className="text-[9px] font-bold text-blue-600 uppercase tracking-tighter">NGƯỜI #{groupIndex + 1}</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-1.5">
                           {images.slice(groupIndex * 2, groupIndex * 2 + 2).map((img, imgIndex) => {
                             const globalIndex = groupIndex * 2 + imgIndex;
                             return (
@@ -378,9 +437,9 @@ export default function App() {
                                 />
                                 <button 
                                   onClick={() => removeImage(globalIndex)}
-                                  className="absolute top-1 right-1 bg-black/50 hover:bg-black/70 text-white p-0.5 rounded-full backdrop-blur-sm transition-colors opacity-0 group-hover:opacity-100"
+                                  className="absolute top-0.5 right-0.5 bg-black/50 hover:bg-black/70 text-white p-0.5 rounded-full backdrop-blur-sm transition-colors opacity-0 group-hover:opacity-100"
                                 >
-                                  <X className="w-2.5 h-2.5" />
+                                  <X className="w-2 h-2" />
                                 </button>
                               </div>
                             );
@@ -424,6 +483,7 @@ export default function App() {
                       <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ngày cấp</th>
                       <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Họ và tên</th>
                       <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ngày sinh</th>
+                      <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Giới tính</th>
                       <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quê quán</th>
                       <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thường trú</th>
                       <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider w-14 text-center">Copy</th>
@@ -470,6 +530,9 @@ export default function App() {
                                   <div className="text-[8px] text-red-500 font-bold mt-0.5">{fieldErrors[`dateOfBirth_${index}`]}</div>
                                 )}
                               </td>
+                              <td className="px-2 py-1 text-xs text-slate-600 whitespace-nowrap">
+                                {item.gender}
+                              </td>
                               <td className="px-2 py-1 text-xs text-slate-600 max-w-[150px] truncate" title={item.hometown}>
                                 {item.hometown}
                               </td>
@@ -498,7 +561,7 @@ export default function App() {
                         })
                       ) : (
                         <tr>
-                          <td colSpan={8} className="py-10 text-center">
+                          <td colSpan={9} className="py-10 text-center">
                             <div className="flex flex-col items-center justify-center text-slate-300 gap-2">
                               <FileText className="w-10 h-10 opacity-20" />
                               <p className="text-sm">Chưa có kết quả nào</p>
@@ -516,8 +579,63 @@ export default function App() {
       </main>
 
       <footer className="max-w-4xl mx-auto px-4 py-12 text-center text-slate-400 text-xs">
-        <p>© 2026 CCCD Reader AI - Powered by TuanMinh</p>
+        <p>© 2026 CCCD Reader AI - Powered by Gemini 3.0 Flash</p>
       </footer>
+
+      <AnimatePresence>
+        {isCameraOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4"
+          >
+            <div className="relative w-full max-w-lg aspect-[3/4] bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-white/10">
+              <video 
+                ref={videoRef}
+                autoPlay 
+                playsInline 
+                className="w-full h-full object-cover"
+              />
+              
+              {/* Camera UI Overlay */}
+              <div className="absolute inset-0 flex flex-col justify-between p-6">
+                <div className="flex justify-end">
+                  <button 
+                    onClick={stopCamera}
+                    className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full backdrop-blur-md transition-all"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+                
+                {/* Guide Frame */}
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="w-full aspect-[1.58/1] border-2 border-dashed border-white/50 rounded-2xl relative">
+                    <div className="absolute -top-8 left-0 right-0 text-center">
+                      <p className="text-white/80 text-xs font-medium uppercase tracking-widest">Đặt CCCD vào khung hình</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-center items-center gap-8">
+                  <div className="w-12 h-12" /> {/* Spacer */}
+                  <button 
+                    onClick={capturePhoto}
+                    className="w-20 h-20 bg-white rounded-full p-1 shadow-xl active:scale-95 transition-transform"
+                  >
+                    <div className="w-full h-full border-4 border-slate-900 rounded-full flex items-center justify-center">
+                      <div className="w-14 h-14 bg-slate-900 rounded-full" />
+                    </div>
+                  </button>
+                  <div className="w-12 h-12" /> {/* Spacer */}
+                </div>
+              </div>
+            </div>
+            <canvas ref={canvasRef} className="hidden" />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
