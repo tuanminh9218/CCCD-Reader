@@ -1025,7 +1025,7 @@ export default function App() {
               <>
                 {/* Left Column: Upload & Preview (Reduced Size) */}
                 <section className="shrink-0 space-y-2">
-            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm" style={{ width: '151px', height: '188px', paddingTop: '6px' }}>
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm" style={{ width: '151px', height: '204px', paddingTop: '6px' }}>
               <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Tải ảnh lên</h2>
               
               <div className="space-y-2">
@@ -1393,6 +1393,8 @@ export default function App() {
                   <input 
                     type="text" 
                     required
+                    onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Vui lòng điền vào trường này')}
+                    onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
                     value={manualFormData.fullName}
                     onChange={(e) => setManualFormData({...manualFormData, fullName: e.target.value.toUpperCase()})}
                     placeholder="NGUYỄN VĂN A"
@@ -1406,6 +1408,8 @@ export default function App() {
                     <input 
                       type="text" 
                       required
+                      onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Vui lòng điền vào trường này')}
+                      onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
                       value={manualFormData.dateOfBirth}
                       onChange={(e) => setManualFormData({...manualFormData, dateOfBirth: handleDateInput(e.target.value)})}
                       placeholder="DD/MM/YYYY"
@@ -1430,7 +1434,6 @@ export default function App() {
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Thường trú</label>
                     <textarea 
-                      required
                       value={manualFormData.permanentResidence}
                       onChange={(e) => setManualFormData({...manualFormData, permanentResidence: e.target.value})}
                       placeholder="Số nhà, đường, phường/xã, quận/huyện"
