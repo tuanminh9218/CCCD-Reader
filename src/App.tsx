@@ -16,7 +16,17 @@ import {
   AlertCircle,
   X,
   Download,
-  Camera
+  Camera,
+  Edit3,
+  Save,
+  ChevronDown,
+  ChevronRight,
+  Globe,
+  Menu,
+  Building2,
+  Image as ImageIcon,
+  Plus,
+  Search
 } from 'lucide-react';
 import { CCCDInfo } from './types';
 
@@ -31,9 +41,44 @@ export default function App() {
   const [duplicateIds, setDuplicateIds] = useState<string[]>([]);
   const [copySuccess, setCopySuccess] = useState<number | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editData, setEditData] = useState<CCCDInfo | null>(null);
+  const [isNguyenKhoiOpen, setIsNguyenKhoiOpen] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
+  const [isCty6789Open, setIsCty6789Open] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [isLogoTabOpen, setIsLogoTabOpen] = useState(false);
+  const [selectedLogo, setSelectedLogo] = useState<string | null>(null);
+  const [customLogo, setCustomLogo] = useState<string | null>(null);
+  const [showMedicalForm, setShowMedicalForm] = useState(false);
+  const [selectedPersonIndex, setSelectedPersonIndex] = useState<number | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+  const [isManualFormOpen, setIsManualFormOpen] = useState(false);
+  const [manualFormData, setManualFormData] = useState<Partial<CCCDInfo>>({
+    fullName: '',
+    dateOfBirth: '',
+    gender: 'Nam',
+    permanentResidence: ''
+  });
+  const [provinceSearch, setProvinceSearch] = useState('');
+  const [selectedProvince, setSelectedProvince] = useState('');
+  const [topProvinces, setTopProvinces] = useState(['Hà Nội', 'TP.HCM mở rộng', 'Đà Nẵng', 'Hải Phòng']);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const maskIdNumber = (id: string) => {
+    if (!id || id.length < 7) return id;
+    const cleanId = id.replace(/\s/g, '');
+    return `${cleanId.substring(0, 3)}...${cleanId.substring(cleanId.length - 4)}`;
+  };
+
+  const getProvinceOnly = (address: string) => {
+    if (!address) return "";
+    const parts = address.split(',').map(p => p.trim());
+    return parts[parts.length - 1] || address;
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -152,7 +197,7 @@ export default function App() {
   const exportToExcel = () => {
     if (results.length === 0) return;
 
-    const headers = ["STT", "Số CCCD", "Ngày cấp", "Họ và tên", "Ngày sinh", "Giới tính", "Quê quán", "Nơi thường trú"];
+    const headers = ["STT", "Số CCCD", "Ngày cấp", "Họ và tên", "Ngày sinh", "Giới tính", "Nơi thường trú"];
     const rows = results.map((item, index) => [
       index + 1,
       item.idNumber,
@@ -160,7 +205,6 @@ export default function App() {
       item.fullName,
       item.dateOfBirth,
       item.gender,
-      item.hometown,
       item.permanentResidence
     ]);
 
@@ -176,7 +220,6 @@ export default function App() {
       { wch: 25 }, // Họ và tên
       { wch: 12 }, // Ngày sinh
       { wch: 10 }, // Giới tính
-      { wch: 30 }, // Quê quán
       { wch: 40 }  // Nơi thường trú
     ];
     worksheet['!cols'] = wscols;
@@ -217,7 +260,6 @@ export default function App() {
                 - fullName: Họ tên (IN HOA).
                 - dateOfBirth: Ngày sinh (DD/MM/YYYY).
                 - gender: Giới tính (Nam/Nữ).
-                - hometown: Quê quán.
                 - permanentResidence: Thường trú.`,
               },
             ],
@@ -236,10 +278,9 @@ export default function App() {
                 fullName: { type: Type.STRING },
                 dateOfBirth: { type: Type.STRING },
                 gender: { type: Type.STRING },
-                hometown: { type: Type.STRING },
                 permanentResidence: { type: Type.STRING },
               },
-              required: ["idNumber", "issueDate", "fullName", "dateOfBirth", "gender", "hometown", "permanentResidence"],
+              required: ["idNumber", "issueDate", "fullName", "dateOfBirth", "gender", "permanentResidence"],
             },
           },
         },
@@ -287,7 +328,13 @@ export default function App() {
       });
 
       setFieldErrors(prev => ({ ...prev, ...newErrors }));
-      setResults(prev => [...prev, ...uniqueResults]);
+      setResults(prev => {
+        const newResults = [...prev, ...uniqueResults];
+        if (selectedPersonIndex === null && newResults.length > 0) {
+          setSelectedPersonIndex(0);
+        }
+        return newResults;
+      });
       setImages([]); // Clear images after successful extraction to prepare for next batch
     } catch (err) {
       console.error("Extraction error:", err);
@@ -310,7 +357,7 @@ export default function App() {
   };
 
   const formatResultLine = (item: CCCDInfo) => {
-    return `${item.idNumber} (${item.issueDate}) - ${item.fullName} - ${item.dateOfBirth} - ${item.gender} - ${item.hometown} - ${item.permanentResidence}`;
+    return `${item.idNumber} (${item.issueDate}) - ${item.fullName} - ${item.dateOfBirth} - ${item.gender} - ${item.permanentResidence}`;
   };
 
   const copyToClipboard = async (text: string, index: number) => {
@@ -321,6 +368,183 @@ export default function App() {
     } catch (err) {
       console.error("Failed to copy:", err);
     }
+  };
+
+  const startEditing = (index: number) => {
+    setEditingIndex(index);
+    setEditData({ ...results[index] });
+  };
+
+  const cancelEditing = () => {
+    setEditingIndex(null);
+    setEditData(null);
+  };
+
+  const saveEdit = () => {
+    if (editingIndex !== null && editData) {
+      const newResults = [...results];
+      newResults[editingIndex] = editData;
+      
+      // Re-validate fields
+      const newErrors = { ...fieldErrors };
+      
+      // Clear old errors for this index
+      Object.keys(newErrors).forEach(key => {
+        if (key.endsWith(`_${editingIndex}`)) {
+          delete newErrors[key];
+        }
+      });
+
+      const idError = validateIdNumber(editData.idNumber);
+      if (idError) newErrors[`idNumber_${editingIndex}`] = idError;
+
+      const dobError = validateDate(editData.dateOfBirth);
+      if (dobError) newErrors[`dateOfBirth_${editingIndex}`] = dobError;
+
+      const issueError = validateDate(editData.issueDate);
+      if (issueError) newErrors[`issueDate_${editingIndex}`] = issueError;
+
+      setFieldErrors(newErrors);
+      setResults(newResults);
+      setEditingIndex(null);
+      setEditData(null);
+    }
+  };
+
+  const handleEditChange = (field: keyof CCCDInfo, value: string) => {
+    if (editData) {
+      setEditData({ ...editData, [field]: value });
+    }
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCustomLogo(reader.result as string);
+        setSelectedLogo(null); // Clear preset selection if custom is uploaded
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const deleteResult = (index: number) => {
+    const newResults = results.filter((_, i) => i !== index);
+    setResults(newResults);
+    
+    // Update selected person index if necessary
+    if (selectedPersonIndex === index) {
+      setSelectedPersonIndex(newResults.length > 0 ? 0 : null);
+    } else if (selectedPersonIndex !== null && selectedPersonIndex > index) {
+      setSelectedPersonIndex(selectedPersonIndex - 1);
+    }
+    
+    setItemToDelete(null);
+  };
+
+  const PROVINCES = [
+    "Hà Nội",
+    "Tuyên Quang (sáp nhập Hà Giang + Tuyên Quang)",
+    "Lào Cai (Yên Bái + Lào Cai)",
+    "Thái Nguyên (Bắc Kạn + Thái Nguyên)",
+    "Phú Thọ (Vĩnh Phúc + Hòa Bình + Phú Thọ)",
+    "Bắc Ninh (Bắc Giang + Bắc Ninh)",
+    "Hưng Yên (Thái Bình + Hưng Yên)",
+    "Hải Phòng (Hải Dương + Hải Phòng)",
+    "Ninh Bình (Hà Nam + Nam Định + Ninh Bình)",
+    "Quảng Trị (Quảng Bình + Quảng Trị)",
+    "Đà Nẵng (Quảng Nam + Đà Nẵng)",
+    "Quảng Ngãi (Kon Tum + Quảng Ngãi)",
+    "Gia Lai (Bình Định + Gia Lai)",
+    "Khánh Hòa (Ninh Thuận + Khánh Hòa)",
+    "Lâm Đồng (Đắk Nông + Bình Thuận + Lâm Đồng)",
+    "Đắk Lắk (Phú Yên + Đắk Lắk)",
+    "TP.HCM mở rộng (TP.HCM + Bình Dương + Bà Rịa–Vũng Tàu)",
+    "Đồng Nai (Đồng Nai + Bình Phước)",
+    "Tây Ninh (Tây Ninh + Long An)",
+    "Cần Thơ (Cần Thơ + Sóc Trăng + Hậu Giang)",
+    "Vĩnh Long (Bến Tre + Vĩnh Long + Trà Vinh)",
+    "Đồng Tháp (Tiền Giang + Đồng Tháp)",
+    "Cà Mau (Bạc Liêu + Cà Mau)",
+    "An Giang (Kiên Giang + An Giang)",
+    "Huế",
+    "Lai Châu",
+    "Điện Biên",
+    "Sơn La",
+    "Lạng Sơn",
+    "Quảng Ninh",
+    "Thanh Hóa",
+    "Nghệ An",
+    "Hà Tĩnh",
+    "Cao Bằng"
+  ];
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    let fullResidence = manualFormData.permanentResidence || '';
+    if (selectedProvince) {
+      // Append province if not already in the string
+      if (!fullResidence.toLowerCase().includes(selectedProvince.toLowerCase())) {
+        fullResidence = fullResidence.trim();
+        if (fullResidence && !fullResidence.endsWith(',')) fullResidence += ', ';
+        fullResidence += selectedProvince;
+      }
+      
+      // Update top provinces (simple logic: move to front)
+      setTopProvinces(prev => {
+        const filtered = prev.filter(p => p !== selectedProvince);
+        return [selectedProvince, ...filtered].slice(0, 4);
+      });
+    }
+
+    const newEntry: CCCDInfo = {
+      idNumber: '',
+      issueDate: '',
+      fullName: manualFormData.fullName || '',
+      dateOfBirth: manualFormData.dateOfBirth || '',
+      gender: manualFormData.gender || 'Nam',
+      permanentResidence: fullResidence
+    };
+    
+    setResults(prev => {
+      const newResults = [...prev, newEntry];
+      if (selectedPersonIndex === null && newResults.length > 0) {
+        setSelectedPersonIndex(0);
+      }
+      return newResults;
+    });
+    
+    setIsManualFormOpen(false);
+    setManualFormData({
+      fullName: '',
+      dateOfBirth: '',
+      gender: 'Nam',
+      permanentResidence: ''
+    });
+    setSelectedProvince('');
+    setProvinceSearch('');
+  };
+
+  const handleDateInput = (value: string) => {
+    // Remove all non-digits
+    const cleanValue = value.replace(/\D/g, '');
+    let formattedValue = '';
+    
+    if (cleanValue.length > 0) {
+      // Add DD
+      formattedValue = cleanValue.substring(0, 2);
+      if (cleanValue.length > 2) {
+        // Add /MM
+        formattedValue += '/' + cleanValue.substring(2, 4);
+        if (cleanValue.length > 4) {
+          // Add /YYYY
+          formattedValue += '/' + cleanValue.substring(4, 8);
+        }
+      }
+    }
+    return formattedValue;
   };
 
   return (
@@ -336,6 +560,7 @@ export default function App() {
           <button 
             onClick={reset}
             className="text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-1.5 text-sm font-medium"
+            title="Xóa tất cả dữ liệu và làm mới trang"
           >
             <RefreshCw className="w-4 h-4" />
             Làm mới
@@ -343,17 +568,470 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="mx-auto px-2 py-4" style={{ width: '960px' }}>
         <div className="flex flex-col lg:flex-row gap-4 items-start">
-          {/* Left Column: Upload & Preview (Reduced Size) */}
-          <section className="shrink-0 space-y-2">
-            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm" style={{ width: '230px', minHeight: '130px', paddingTop: '6px' }}>
+          {/* Sidebar */}
+          <aside className="w-48 shrink-0 space-y-2">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <button 
+                onClick={() => setIsNguyenKhoiOpen(!isNguyenKhoiOpen)}
+                className="w-full flex items-center justify-between p-3 hover:bg-slate-50 transition-colors group"
+                title={isNguyenKhoiOpen ? "Đóng tab NGUYÊN KHÔI" : "Mở tab NGUYÊN KHÔI"}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="bg-blue-100 p-1.5 rounded-lg group-hover:bg-blue-200 transition-colors">
+                    <Globe className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <span className="font-bold text-xs text-slate-700 uppercase tracking-wider">NGUYÊN KHÔI</span>
+                </div>
+                {isNguyenKhoiOpen ? (
+                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                )}
+              </button>
+              
+              <AnimatePresence>
+                {isNguyenKhoiOpen && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden bg-slate-50/50"
+                  >
+                    <div className="p-1 space-y-1">
+                      {['Tiếng Việt', 'Tiếng Trung', 'Tiếng Anh'].map((lang) => (
+                        <button
+                          key={lang}
+                          onClick={() => {
+                            setSelectedLanguage(lang);
+                            if (lang === 'Tiếng Việt') {
+                              setShowMedicalForm(true);
+                              if (selectedPersonIndex === null && results.length > 0) {
+                                setSelectedPersonIndex(0);
+                              }
+                            } else {
+                              setShowMedicalForm(false);
+                            }
+                          }}
+                          className={`w-full text-left px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                            selectedLanguage === lang 
+                              ? 'bg-blue-600 text-white shadow-md shadow-blue-100' 
+                              : 'text-slate-600 hover:bg-white hover:text-blue-600'
+                          }`}
+                        >
+                          {lang}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <button 
+                onClick={() => setIsCty6789Open(!isCty6789Open)}
+                className="w-full flex items-center justify-between p-3 hover:bg-slate-50 transition-colors group"
+                title={isCty6789Open ? "Đóng tab CTY 6789" : "Mở tab CTY 6789"}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="bg-blue-100 p-1.5 rounded-lg group-hover:bg-blue-200 transition-colors">
+                    <Building2 className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <span className="font-bold text-xs text-slate-700 uppercase tracking-wider">CTY 6789</span>
+                </div>
+                {isCty6789Open ? (
+                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                )}
+              </button>
+              
+              <AnimatePresence>
+                {isCty6789Open && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden bg-slate-50/50"
+                  >
+                    <div className="p-1 space-y-1">
+                      {['Mẫu A1', 'Mẫu A2', 'Mẫu A3', 'Mẫu A4', 'Mẫu A5'].map((model) => (
+                        <button
+                          key={model}
+                          onClick={() => setSelectedModel(model)}
+                          className={`w-full text-left px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                            selectedModel === model 
+                              ? 'bg-blue-600 text-white shadow-md shadow-blue-100' 
+                              : 'text-slate-600 hover:bg-white hover:text-blue-600'
+                          }`}
+                        >
+                          {model}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <button 
+                onClick={() => setIsLogoTabOpen(!isLogoTabOpen)}
+                className="w-full flex items-center justify-between p-3 hover:bg-slate-50 transition-colors group"
+                title={isLogoTabOpen ? "Đóng tab LOGO" : "Mở tab LOGO"}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="bg-blue-100 p-1.5 rounded-lg group-hover:bg-blue-200 transition-colors">
+                    <ImageIcon className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <span className="font-bold text-xs text-slate-700 uppercase tracking-wider">LOGO</span>
+                </div>
+                {isLogoTabOpen ? (
+                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                )}
+              </button>
+              
+              <AnimatePresence>
+                {isLogoTabOpen && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden bg-slate-50/50"
+                  >
+                    <div className="p-2 space-y-3">
+                      {/* Custom Logo Upload */}
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Tải logo tùy chỉnh</label>
+                        <div 
+                          onClick={() => logoInputRef.current?.click()}
+                          className={`w-full border-2 border-dashed rounded-xl p-2 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all group ${
+                            customLogo ? 'border-blue-400 bg-blue-50/30' : 'border-slate-200 hover:border-blue-400 hover:bg-blue-50/30'
+                          }`}
+                        >
+                          <input 
+                            type="file" 
+                            ref={logoInputRef}
+                            onChange={handleLogoUpload}
+                            accept="image/*"
+                            className="hidden"
+                          />
+                          {customLogo ? (
+                            <div className="relative w-full aspect-square rounded-lg overflow-hidden border border-blue-200">
+                              <img src={customLogo} alt="Custom Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCustomLogo(null);
+                                }}
+                                className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-full shadow-sm"
+                                title="Xóa logo tùy chỉnh"
+                              >
+                                <X className="w-2 h-2" />
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
+                              <span className="text-[9px] font-semibold text-slate-500">Chọn ảnh logo</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="h-px bg-slate-200 mx-2" />
+
+                      {/* Preset Logos */}
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Logo có sẵn</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { id: 'logo1', url: 'https://ais-dev-l27ehl2nr5tn5nl6qkwq7y-487314014322.asia-southeast1.run.app/api/images/logo-mpuh.png', name: 'Logo MPUH' },
+                            { id: 'logo2', url: 'https://picsum.photos/seed/clinic/100/100', name: 'Logo 2' },
+                            { id: 'logo3', url: 'https://picsum.photos/seed/medical/100/100', name: 'Logo 3' },
+                            { id: 'logo4', url: 'https://picsum.photos/seed/health/100/100', name: 'Logo 4' }
+                          ].map((logo) => (
+                            <button
+                              key={logo.id}
+                              onClick={() => {
+                                setSelectedLogo(logo.url);
+                                setCustomLogo(null); // Clear custom if preset is selected
+                              }}
+                              className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                                selectedLogo === logo.url 
+                                  ? 'border-blue-600 ring-2 ring-blue-100' 
+                                  : 'border-slate-200 hover:border-blue-300'
+                              }`}
+                              title={`Chọn ${logo.name}`}
+                            >
+                              <img 
+                                src={logo.url} 
+                                alt={logo.name} 
+                                className="w-full h-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                              {selectedLogo === logo.url && (
+                                <div className="absolute inset-0 bg-blue-600/10 flex items-center justify-center">
+                                  <div className="bg-blue-600 text-white p-1 rounded-full">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                  </div>
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </aside>
+
+          <div className="flex flex-col lg:flex-row gap-2 items-start flex-1">
+            {showMedicalForm ? (
+              <section className="flex-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm overflow-y-auto custom-scrollbar" style={{ maxHeight: '80vh' }}>
+                <div className="flex items-center justify-between mb-6 border-b pb-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-800">Mẫu Khám Sức Khỏe (Tiếng Việt)</h2>
+                    <p className="text-xs text-slate-500">Chọn người từ danh sách để điền thông tin tự động</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <select 
+                      className="text-xs border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => setSelectedPersonIndex(e.target.value === "" ? null : parseInt(e.target.value))}
+                      value={selectedPersonIndex ?? ""}
+                    >
+                      <option value="">-- Chọn người --</option>
+                      {results.map((r, i) => (
+                        <option key={i} value={i}>{r.fullName} - {r.idNumber}</option>
+                      ))}
+                    </select>
+                    <button 
+                      onClick={() => window.print()}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md shadow-blue-100"
+                      title="In biểu mẫu hiện tại"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      In biểu mẫu
+                    </button>
+                    <button 
+                      onClick={() => setShowMedicalForm(false)}
+                      className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
+                      title="Đóng biểu mẫu"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* The Form Content (Matching PDF Page 1) */}
+                <div id="medical-form-to-print" className="bg-white border border-slate-300 p-8 shadow-inner mx-auto print:p-0 print:border-0 print:shadow-none" style={{ width: '210mm', minHeight: '297mm', fontFamily: 'Times New Roman, serif' }}>
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="flex items-center gap-3">
+                      {customLogo ? (
+                        <img 
+                          src={customLogo} 
+                          alt="Hospital Custom Logo" 
+                          className="w-16 h-16 object-contain rounded"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : selectedLogo ? (
+                        <img 
+                          src={selectedLogo} 
+                          alt="Hospital Logo" 
+                          className="w-12 h-12 object-contain rounded"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-xl">MP</div>
+                      )}
+                      <div>
+                        <h3 className="text-blue-700 font-bold text-sm leading-tight">MPUH</h3>
+                        <p className="text-[8px] text-blue-600 font-bold uppercase">Bệnh viện Đại học Y Dược</p>
+                        <p className="text-[6px] text-blue-500 uppercase">Medical and Pharmaceutical University Hospital</p>
+                      </div>
+                    </div>
+                    <div className="border border-slate-800 px-4 py-1 text-xs font-bold">
+                      MẪU SONG NGỮ
+                    </div>
+                    <div className="text-[10px] space-y-1">
+                      <p>Số điện thoại: ................................</p>
+                    </div>
+                  </div>
+
+                  <div className="text-center mb-6">
+                    <p className="text-[10px]">Số: ..................../KHTH</p>
+                    <h1 className="text-base font-bold uppercase mt-2">TÓM TẮT KẾT QUẢ KHÁM SỨC KHỎE CỦA NGƯỜI</h1>
+                    <h1 className="text-base font-bold uppercase">ĐI LAO ĐỘNG, HỌC TẬP VÀ CÔNG TÁC NƯỚC NGOÀI</h1>
+                    <p className="italic text-xs font-bold">(Bản lưu tại BV ĐHYD)</p>
+                  </div>
+
+                  <div className="grid grid-cols-12 gap-y-3 text-sm mb-6">
+                    <div className="col-span-8 flex items-baseline gap-2">
+                      <span className="font-bold whitespace-nowrap">1. Họ và tên:</span>
+                      <span className="border-b border-dotted border-slate-400 flex-1 min-h-[1.5rem] px-2 text-blue-700 font-bold uppercase">
+                        {selectedPersonIndex !== null ? results[selectedPersonIndex].fullName : ""}
+                      </span>
+                    </div>
+                    <div className="col-span-4 flex items-baseline gap-2">
+                      <span className="font-bold whitespace-nowrap">Giới tính:</span>
+                      <span className="border-b border-dotted border-slate-400 flex-1 min-h-[1.5rem] px-2">
+                        {selectedPersonIndex !== null ? results[selectedPersonIndex].gender : ""}
+                      </span>
+                    </div>
+
+                    <div className="col-span-12 flex items-baseline gap-2">
+                      <span className="font-bold whitespace-nowrap">2. Ngày tháng năm sinh:</span>
+                      <span className="border-b border-dotted border-slate-400 flex-1 min-h-[1.5rem] px-2">
+                        {selectedPersonIndex !== null ? results[selectedPersonIndex].dateOfBirth : ""}
+                      </span>
+                    </div>
+
+                    <div className="col-span-12 flex items-baseline gap-2">
+                      <span className="font-bold whitespace-nowrap">3. Địa chỉ:</span>
+                      <span className="border-b border-dotted border-slate-400 flex-1 min-h-[1.5rem] px-2 text-xs">
+                        {selectedPersonIndex !== null ? results[selectedPersonIndex].permanentResidence : ""}
+                      </span>
+                    </div>
+
+                    <div className="col-span-12 flex items-baseline gap-2">
+                      <span className="font-bold whitespace-nowrap">4. Tên cơ quan tuyển dụng:</span>
+                      <span className="border-b border-dotted border-slate-400 flex-1 min-h-[1.5rem] px-2"></span>
+                    </div>
+
+                    <div className="col-span-12 flex items-baseline gap-2">
+                      <span className="font-bold whitespace-nowrap">5. Công nhân đi lao động tại:</span>
+                      <span className="border-b border-dotted border-slate-400 flex-1 min-h-[1.5rem] px-2"></span>
+                    </div>
+                  </div>
+
+                  <table className="w-full border-collapse border border-slate-800 text-[11px]">
+                    <thead>
+                      <tr>
+                        <th className="border border-slate-800 p-1 w-8">TT</th>
+                        <th className="border border-slate-800 p-1 w-1/3">NỘI DUNG KHÁM</th>
+                        <th className="border border-slate-800 p-1">KẾT QUẢ</th>
+                        <th className="border border-slate-800 p-1 w-24">BS KHÁM KÝ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="border border-slate-800 p-2 text-center">1</td>
+                        <td className="border border-slate-800 p-2">Chiều cao, cân nặng</td>
+                        <td className="border border-slate-800 p-2">
+                          Cao: ....................cm. / Nặng: ....................kg
+                        </td>
+                        <td className="border border-slate-800 p-2"></td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-800 p-2 text-center">2</td>
+                        <td className="border border-slate-800 p-2">Mạch, huyết áp</td>
+                        <td className="border border-slate-800 p-2">
+                          Mạch: ....................l/p. / Huyết áp: ....................mmHg
+                        </td>
+                        <td className="border border-slate-800 p-2"></td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-800 p-2 text-center">3</td>
+                        <td className="border border-slate-800 p-2">Khám Nội khoa (Tim, Phổi, NT, Bệnh Tiêu hóa, Bệnh Thận,....)</td>
+                        <td className="border border-slate-800 p-2"></td>
+                        <td className="border border-slate-800 p-2"></td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-800 p-2 text-center">4</td>
+                        <td className="border border-slate-800 p-2">Khám Ngoại khoa - Da liễu - Tâm thần kinh - Cơ xương khớp....</td>
+                        <td className="border border-slate-800 p-2"></td>
+                        <td className="border border-slate-800 p-2"></td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-800 p-2 text-center">5</td>
+                        <td className="border border-slate-800 p-2">Khám Tai - Mũi - Họng</td>
+                        <td className="border border-slate-800 p-2"></td>
+                        <td className="border border-slate-800 p-2"></td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-800 p-2 text-center">6</td>
+                        <td className="border border-slate-800 p-2">Khám về Mắt</td>
+                        <td className="border border-slate-800 p-2">
+                          Thị lực: MP: .................... MT: ....................<br/>
+                          Bệnh về mắt: ............................................................
+                        </td>
+                        <td className="border border-slate-800 p-2"></td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-800 p-2 text-center">7</td>
+                        <td className="border border-slate-800 p-2">Khám Răng - Hàm - Mặt</td>
+                        <td className="border border-slate-800 p-2"></td>
+                        <td className="border border-slate-800 p-2"></td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-800 p-2 text-center">8</td>
+                        <td className="border border-slate-800 p-2">Khám Điện tâm đồ (điện tim)</td>
+                        <td className="border border-slate-800 p-2"></td>
+                        <td className="border border-slate-800 p-2"></td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-800 p-2 text-center">9</td>
+                        <td className="border border-slate-800 p-2">Kết quả X-Quang tim phổi</td>
+                        <td className="border border-slate-800 p-2"></td>
+                        <td className="border border-slate-800 p-2"></td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-800 p-2 text-center">10</td>
+                        <td className="border border-slate-800 p-2">Siêu âm ổ bụng tổng quát</td>
+                        <td className="border border-slate-800 p-2"></td>
+                        <td className="border border-slate-800 p-2"></td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-800 p-2 text-center">11</td>
+                        <td className="border border-slate-800 p-2">Kết quả XN nước tiểu (thường quy, có thai sớm)</td>
+                        <td className="border border-slate-800 p-2"></td>
+                        <td className="border border-slate-800 p-2"></td>
+                      </tr>
+                      <tr>
+                        <td className="border border-slate-800 p-2 text-center">12</td>
+                        <td className="border border-slate-800 p-2">
+                          XN máu (HIV, HBsAg, VDRL...)<br/>
+                          Nhóm máu: <span className="inline-block w-12 h-5 border border-slate-800 ml-2"></span>
+                        </td>
+                        <td className="border border-slate-800 p-2"></td>
+                        <td className="border border-slate-800 p-2"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div className="mt-4 text-[11px] space-y-4">
+                    <p className="font-bold">Tôi xác nhận rằng: <span className="font-normal italic">Người lao động này đủ/không đủ sức khỏe để làm việc (Nếu không đủ xin nêu lý do)</span></p>
+                    <p className="border-b border-dotted border-slate-400 w-full min-h-[1rem]"></p>
+                    
+                    <div className="grid grid-cols-2 mt-8">
+                      <div className="text-center">
+                        <p className="font-bold uppercase">GIÁM ĐỐC BỆNH VIỆN</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="italic">Hà Nội, Ngày ....... tháng ....... năm .......</p>
+                        <p className="font-bold uppercase mt-1">KT.TRƯỞNG PHÒNG KHTH</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <>
+                {/* Left Column: Upload & Preview (Reduced Size) */}
+                <section className="shrink-0 space-y-2">
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm" style={{ width: '151px', height: '188px', paddingTop: '6px' }}>
               <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Tải ảnh lên</h2>
               
               <div className="space-y-2">
                 <div className="flex flex-col gap-2">
                   <div className="space-y-1">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Chọn tệp ảnh</label>
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1" style={{ paddingTop: '1px', marginTop: '13px', display: 'block' }}>Chọn tệp ảnh</label>
                     <input 
                       type="file" 
                       ref={fileInputRef}
@@ -366,7 +1044,8 @@ export default function App() {
                   <div 
                     onClick={startCamera}
                     className="w-full border-2 border-dashed border-slate-200 rounded-xl p-2 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all group"
-                    style={{ height: '50px' }}
+                    style={{ height: '41px' }}
+                    title="Mở camera để chụp ảnh CCCD"
                   >
                     <div className="bg-slate-100 p-1 rounded-full group-hover:bg-blue-100 transition-colors">
                       <Camera className="w-3 h-3 text-slate-400 group-hover:text-blue-600" />
@@ -382,15 +1061,25 @@ export default function App() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     onClick={extractInfo}
-                    className="w-[200px] bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold py-2 rounded-xl shadow-md shadow-blue-200 transition-all flex items-center justify-center gap-2 text-xs border border-blue-400/30"
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold py-2 rounded-xl shadow-md shadow-blue-200 transition-all flex items-center justify-center gap-2 text-xs border border-blue-400/30"
+                    title="Bắt đầu trích xuất thông tin từ ảnh đã chọn"
                   >
                     <FileText className="w-3.5 h-3.5" />
-                    Trích xuất ngay
+                    Trích xuất
                   </motion.button>
                 )}
 
+                <button
+                  onClick={() => setIsManualFormOpen(true)}
+                  className="w-full bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-200 font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-[10px]"
+                  title="Tự thêm thông tin thủ công"
+                >
+                  <Plus className="w-3 h-3" />
+                  Thêm thủ công
+                </button>
+
                 {loading && (
-                  <div className="w-[200px] flex flex-col items-center gap-1 py-1">
+                  <div className="w-full flex flex-col items-center gap-1 py-1">
                     <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
                     <p className="text-[9px] font-bold text-slate-500 animate-pulse uppercase tracking-wider">Đang phân tích...</p>
                   </div>
@@ -400,7 +1089,7 @@ export default function App() {
                   <motion.div 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="w-[200px] p-2 bg-red-50 border border-red-100 rounded-xl flex gap-2 text-red-700 text-[9px] font-medium"
+                    className="w-full p-2 bg-red-50 border border-red-100 rounded-xl flex gap-2 text-red-700 text-[9px] font-medium"
                   >
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     <p>{error}</p>
@@ -416,7 +1105,7 @@ export default function App() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="p-1.5 border border-blue-100 bg-blue-50/10 rounded-xl space-y-1.5"
-                        style={{ width: '200px' }}
+                        style={{ width: '125px' }}
                       >
                         <div className="flex items-center justify-between px-1">
                           <span className="text-[9px] font-bold text-blue-600 uppercase tracking-tighter">NGƯỜI #{groupIndex + 1}</span>
@@ -438,6 +1127,7 @@ export default function App() {
                                 <button 
                                   onClick={() => removeImage(globalIndex)}
                                   className="absolute top-0.5 right-0.5 bg-black/50 hover:bg-black/70 text-white p-0.5 rounded-full backdrop-blur-sm transition-colors opacity-0 group-hover:opacity-100"
+                                  title="Xóa ảnh này"
                                 >
                                   <X className="w-2 h-2" />
                                 </button>
@@ -454,17 +1144,18 @@ export default function App() {
           </section>
 
           {/* Right Column: History Table */}
-          <section className="flex-1 space-y-6 min-w-0">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm h-full flex flex-col overflow-hidden" style={{ width: '960px' }}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
+          <section className="flex-1 space-y-4 min-w-0">
+            <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm h-full flex flex-col overflow-hidden" style={{ height: '188px' }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
                   <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Danh sách trích xuất (Bảng Excel)</h2>
                   {results.length > 0 && (
                     <button 
                       onClick={exportToExcel}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-[10px] font-bold rounded-lg shadow-sm transition-all"
+                      className="flex items-center gap-1.5 px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-[10px] font-bold rounded-lg shadow-sm transition-all"
+                      title="Xuất danh sách ra file Excel (.xlsx)"
                     >
-                      <Download className="w-3.5 h-3.5" />
+                      <Download className="w-3 h-3" />
                       Xuất Excel (.xlsx)
                     </button>
                   )}
@@ -474,27 +1165,29 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-x-auto custom-scrollbar border border-slate-100 rounded-xl">
-                <table className="w-full text-left border-collapse min-w-[800px]">
+              <div className="flex-1 overflow-x-auto custom-scrollbar border border-slate-100 rounded-xl" style={{ height: '155px' }}>
+                <table className="w-auto text-left border-collapse table-auto">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider w-10 text-center">STT</th>
-                      <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Số CCCD</th>
-                      <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ngày cấp</th>
-                      <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Họ và tên</th>
-                      <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ngày sinh</th>
-                      <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Giới tính</th>
-                      <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quê quán</th>
-                      <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thường trú</th>
-                      <th className="px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider w-14 text-center">Copy</th>
+                      <th className="px-0 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter w-5 text-center">STT</th>
+                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Số CCCD</th>
+                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Ngày cấp</th>
+                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Họ và tên</th>
+                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Ngày sinh</th>
+                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Giới tính</th>
+                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Thường trú</th>
+                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter w-14 text-center">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     <AnimatePresence initial={false}>
                       {results.length > 0 ? (
                         results.map((item, index) => {
-                          const lineText = formatResultLine(item);
-                          const isDuplicate = duplicateIds.includes(item.idNumber);
+                          const isEditing = editingIndex === index;
+                          const displayItem = isEditing && editData ? editData : item;
+                          const lineText = formatResultLine(displayItem);
+                          const isDuplicate = duplicateIds.includes(displayItem.idNumber);
+                          
                           return (
                             <motion.tr 
                               key={index}
@@ -502,59 +1195,139 @@ export default function App() {
                               animate={{ 
                                 opacity: 1, 
                                 y: 0,
-                                backgroundColor: isDuplicate ? "rgba(239, 68, 68, 0.05)" : "transparent"
+                                backgroundColor: isEditing ? "rgba(59, 130, 246, 0.05)" : (isDuplicate ? "rgba(239, 68, 68, 0.05)" : "transparent")
                               }}
-                              className={`transition-all duration-500 group ${isDuplicate ? 'border-l-4 border-l-red-500 bg-red-50/50' : 'hover:bg-blue-50/30'}`}
+                              className={`transition-all duration-500 group ${isEditing ? 'bg-blue-50/30' : (isDuplicate ? 'border-l-4 border-l-red-500 bg-red-50/50' : 'hover:bg-blue-50/30')}`}
                             >
-                              <td className="px-2 py-1 text-xs font-bold text-slate-400 text-center">
+                              <td className="px-0 py-0.5 text-xs font-bold text-slate-400 text-center">
                                 {index + 1}
                               </td>
-                              <td className="px-2 py-1 text-xs text-slate-700 font-medium whitespace-nowrap">
-                                {item.idNumber}
+                              <td className="px-0.5 py-0.5 text-xs text-slate-700 font-medium whitespace-nowrap">
+                                {isEditing ? (
+                                  <input 
+                                    type="text" 
+                                    value={editData?.idNumber} 
+                                    onChange={(e) => handleEditChange('idNumber', e.target.value)}
+                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-blue-500"
+                                  />
+                                ) : maskIdNumber(item.idNumber)}
                                 {fieldErrors[`idNumber_${index}`] && (
                                   <div className="text-[8px] text-red-500 font-bold mt-0.5">{fieldErrors[`idNumber_${index}`]}</div>
                                 )}
                               </td>
-                              <td className="px-2 py-1 text-xs text-slate-600 whitespace-nowrap">
-                                {item.issueDate}
+                              <td className="px-0.5 py-0.5 text-xs text-slate-600 whitespace-nowrap">
+                                {isEditing ? (
+                                  <input 
+                                    type="text" 
+                                    value={editData?.issueDate} 
+                                    onChange={(e) => handleEditChange('issueDate', e.target.value)}
+                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-blue-500"
+                                  />
+                                ) : (item.issueDate || "Không có")}
                                 {fieldErrors[`issueDate_${index}`] && (
-                                  <div className="text-[8px] text-red-500 font-bold mt-0.5">{fieldErrors[`issueDate_${index}`]}</div>
+                                  <div className="text-[8px] text-red-500 font-bold mt-0.5">
+                                    {fieldErrors[`issueDate_${index}`] === "Định dạng ngày phải là DD/MM/YYYY" ? "Không có" : fieldErrors[`issueDate_${index}`]}
+                                  </div>
                                 )}
                               </td>
-                              <td className="px-2 py-1 text-xs text-slate-900 font-bold uppercase whitespace-nowrap">
-                                {item.fullName}
+                              <td className="px-0.5 py-0.5 text-xs text-slate-900 font-bold uppercase whitespace-nowrap">
+                                {isEditing ? (
+                                  <input 
+                                    type="text" 
+                                    value={editData?.fullName} 
+                                    onChange={(e) => handleEditChange('fullName', e.target.value)}
+                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-blue-500 uppercase"
+                                  />
+                                ) : item.fullName}
                               </td>
-                              <td className="px-2 py-1 text-xs text-slate-600 whitespace-nowrap">
-                                {item.dateOfBirth}
+                              <td className="px-0.5 py-0.5 text-xs text-slate-600 whitespace-nowrap">
+                                {isEditing ? (
+                                  <input 
+                                    type="text" 
+                                    value={editData?.dateOfBirth} 
+                                    onChange={(e) => handleEditChange('dateOfBirth', e.target.value)}
+                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-blue-500"
+                                  />
+                                ) : item.dateOfBirth}
                                 {fieldErrors[`dateOfBirth_${index}`] && (
                                   <div className="text-[8px] text-red-500 font-bold mt-0.5">{fieldErrors[`dateOfBirth_${index}`]}</div>
                                 )}
                               </td>
-                              <td className="px-2 py-1 text-xs text-slate-600 whitespace-nowrap">
-                                {item.gender}
+                              <td className="px-0.5 py-0.5 text-xs text-slate-600 whitespace-nowrap">
+                                {isEditing ? (
+                                  <select 
+                                    value={editData?.gender} 
+                                    onChange={(e) => handleEditChange('gender', e.target.value)}
+                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-blue-500"
+                                  >
+                                    <option value="Nam">Nam</option>
+                                    <option value="Nữ">Nữ</option>
+                                  </select>
+                                ) : item.gender}
                               </td>
-                              <td className="px-2 py-1 text-xs text-slate-600 max-w-[150px] truncate" title={item.hometown}>
-                                {item.hometown}
+                              <td className="px-0.5 py-0.5 text-xs text-slate-600 truncate" title={displayItem.permanentResidence}>
+                                {isEditing ? (
+                                  <input 
+                                    type="text" 
+                                    value={editData?.permanentResidence} 
+                                    onChange={(e) => handleEditChange('permanentResidence', e.target.value)}
+                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-blue-500"
+                                  />
+                                ) : getProvinceOnly(item.permanentResidence)}
                               </td>
-                              <td className="px-2 py-1 text-xs text-slate-600 max-w-[200px] truncate" title={item.permanentResidence}>
-                                {item.permanentResidence}
-                              </td>
-                              <td className="px-2 py-1 text-center">
-                                <button 
-                                  onClick={() => copyToClipboard(lineText, index)}
-                                  className={`p-1 rounded-lg transition-all ${
-                                    copySuccess === index 
-                                      ? 'bg-green-100 text-green-600' 
-                                      : 'bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 opacity-0 group-hover:opacity-100'
-                                  }`}
-                                  title="Copy hàng này"
-                                >
-                                  {copySuccess === index ? (
-                                    <CheckCircle2 className="w-3 h-3" />
+                              <td className="px-0.5 py-0.5 text-center">
+                                <div className="flex items-center justify-center gap-0.5">
+                                  {isEditing ? (
+                                    <>
+                                      <button 
+                                        onClick={saveEdit}
+                                        className="p-1 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                                        title="Lưu"
+                                      >
+                                        <Save className="w-3 h-3" />
+                                      </button>
+                                      <button 
+                                        onClick={cancelEditing}
+                                        className="p-1 bg-slate-400 text-white rounded hover:bg-slate-500 transition-colors"
+                                        title="Hủy"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </>
                                   ) : (
-                                    <FileText className="w-3 h-3" />
+                                    <>
+                                      <button 
+                                        onClick={() => startEditing(index)}
+                                        className="p-1 bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                        title="Sửa"
+                                      >
+                                        <Edit3 className="w-3 h-3" />
+                                      </button>
+                                      <button 
+                                        onClick={() => copyToClipboard(lineText, index)}
+                                        className={`p-1 rounded-lg transition-all ${
+                                          copySuccess === index 
+                                            ? 'bg-green-100 text-green-600' 
+                                            : 'bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 opacity-0 group-hover:opacity-100'
+                                        }`}
+                                        title="Copy hàng này"
+                                      >
+                                        {copySuccess === index ? (
+                                          <CheckCircle2 className="w-3 h-3" />
+                                        ) : (
+                                          <FileText className="w-3 h-3" />
+                                        )}
+                                      </button>
+                                      <button 
+                                        onClick={() => setItemToDelete(index)}
+                                        className="p-1 bg-white text-slate-400 hover:text-red-600 hover:bg-red-50 border border-slate-200 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                        title="Xóa hàng này"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </>
                                   )}
-                                </button>
+                                </div>
                               </td>
                             </motion.tr>
                           );
@@ -575,12 +1348,234 @@ export default function App() {
               </div>
             </div>
           </section>
-        </div>
-      </main>
+        </>
+      )}
+    </div>
+  </div>
+</main>
 
       <footer className="max-w-4xl mx-auto px-4 py-12 text-center text-slate-400 text-xs">
         <p>© 2026 CCCD Reader AI - Powered by Gemini 3.0 Flash</p>
       </footer>
+
+      <AnimatePresence>
+        {isManualFormOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 max-w-md w-full"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-100 p-2 rounded-full">
+                    <Plus className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <h3 className="text-lg font-bold">Thêm thông tin thủ công</h3>
+                </div>
+                <button 
+                  onClick={() => setIsManualFormOpen(false)}
+                  className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleManualSubmit} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Họ và tên</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={manualFormData.fullName}
+                    onChange={(e) => setManualFormData({...manualFormData, fullName: e.target.value.toUpperCase()})}
+                    placeholder="NGUYỄN VĂN A"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Ngày sinh</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={manualFormData.dateOfBirth}
+                      onChange={(e) => setManualFormData({...manualFormData, dateOfBirth: handleDateInput(e.target.value)})}
+                      placeholder="DD/MM/YYYY"
+                      maxLength={10}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Giới tính</label>
+                    <select 
+                      value={manualFormData.gender}
+                      onChange={(e) => setManualFormData({...manualFormData, gender: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Nam">Nam</option>
+                      <option value="Nữ">Nữ</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Thường trú</label>
+                    <textarea 
+                      required
+                      value={manualFormData.permanentResidence}
+                      onChange={(e) => setManualFormData({...manualFormData, permanentResidence: e.target.value})}
+                      placeholder="Số nhà, đường, phường/xã, quận/huyện"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                    />
+                  </div>
+                  <div className="space-y-1 flex flex-col">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Tỉnh thành</label>
+                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col gap-3">
+                      {/* Top Tags */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {topProvinces.map(p => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => {
+                              setSelectedProvince(p);
+                              setProvinceSearch(p);
+                            }}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                              selectedProvince === p 
+                                ? 'bg-blue-600 text-white shadow-sm' 
+                                : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
+                            }`}
+                          >
+                            {p.split(' (')[0]}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Search Input */}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <input 
+                          type="text"
+                          value={provinceSearch}
+                          onChange={(e) => {
+                            setProvinceSearch(e.target.value);
+                            // If user types something that matches exactly, select it
+                            const match = PROVINCES.find(p => p.toLowerCase() === e.target.value.toLowerCase());
+                            if (match) setSelectedProvince(match);
+                          }}
+                          placeholder="Tìm tỉnh thành..."
+                          className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+
+                      {/* Filtered List */}
+                      <div className="flex-1 overflow-y-auto max-h-[120px] pr-1 custom-scrollbar">
+                        <div className="flex flex-col gap-1">
+                          {PROVINCES.filter(p => 
+                            p.toLowerCase().includes(provinceSearch.toLowerCase())
+                          ).sort((a, b) => {
+                            // Prioritize those in topProvinces
+                            const aIndex = topProvinces.indexOf(a);
+                            const bIndex = topProvinces.indexOf(b);
+                            if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+                            if (aIndex !== -1) return -1;
+                            if (bIndex !== -1) return 1;
+                            return 0;
+                          }).map(p => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => {
+                                setSelectedProvince(p);
+                                setProvinceSearch(p);
+                              }}
+                              className={`text-left px-3 py-1.5 rounded-lg text-xs transition-all ${
+                                selectedProvince === p
+                                  ? 'bg-blue-50 text-blue-600 font-bold'
+                                  : 'hover:bg-slate-100 text-slate-600'
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    type="button"
+                    onClick={() => setIsManualFormOpen(false)}
+                    className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-100 transition-colors"
+                  >
+                    Thêm vào danh sách
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {itemToDelete !== null && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 max-w-sm w-full"
+            >
+              <div className="flex items-center gap-3 mb-4 text-red-600">
+                <div className="bg-red-100 p-2 rounded-full">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold">Xác nhận xóa?</h3>
+              </div>
+              <p className="text-slate-600 text-sm mb-6">
+                Bạn có chắc chắn muốn xóa thông tin của <span className="font-bold text-slate-900">{results[itemToDelete]?.fullName}</span>? Hành động này không thể hoàn tác.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setItemToDelete(null)}
+                  className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  onClick={() => deleteResult(itemToDelete)}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-md shadow-red-100 transition-colors"
+                >
+                  Xác nhận xóa
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isCameraOpen && (
@@ -604,6 +1599,7 @@ export default function App() {
                   <button 
                     onClick={stopCamera}
                     className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full backdrop-blur-md transition-all"
+                    title="Đóng Camera"
                   >
                     <X className="w-6 h-6" />
                   </button>
@@ -623,6 +1619,7 @@ export default function App() {
                   <button 
                     onClick={capturePhoto}
                     className="w-20 h-20 bg-white rounded-full p-1 shadow-xl active:scale-95 transition-transform"
+                    title="Chụp ảnh"
                   >
                     <div className="w-full h-full border-4 border-slate-900 rounded-full flex items-center justify-center">
                       <div className="w-14 h-14 bg-slate-900 rounded-full" />

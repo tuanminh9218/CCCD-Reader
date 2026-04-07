@@ -17,3 +17,26 @@
     @apply bg-blue-600 text-white px-3 py-1.5 rounded-lg border-none cursor-pointer hover:bg-blue-700 transition-all mr-2 font-bold uppercase text-[9px] tracking-wider;
   }
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #medical-form-to-print, #medical-form-to-print * {
+    visibility: visible;
+  }
+  #medical-form-to-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}

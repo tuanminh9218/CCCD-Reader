@@ -4,7 +4,6 @@ export interface CCCDInfo {
   fullName: string;
   dateOfBirth: string;
   gender: string;
-  hometown: string;
   permanentResidence: string;
 }
 
