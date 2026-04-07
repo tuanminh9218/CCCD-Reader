@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { motion, AnimatePresence } from "motion/react";
 import * as XLSX from 'xlsx';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
 import { 
   Upload, 
   FileText, 
@@ -26,8 +28,28 @@ import {
   Building2,
   Image as ImageIcon,
   Plus,
-  Search
+  Search,
+  GripVertical,
+  Trash2,
+  Settings2
 } from 'lucide-react';
+import { 
+  DndContext, 
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { CCCDInfo } from './types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -62,11 +84,96 @@ export default function App() {
   });
   const [provinceSearch, setProvinceSearch] = useState('');
   const [selectedProvince, setSelectedProvince] = useState('');
+  const [isEditingForm, setIsEditingForm] = useState(false);
+  const [formFields, setFormFields] = useState([
+    { id: 'field-1', label: '1. Họ và tên:', valueKey: 'fullName' as keyof CCCDInfo, isBold: true, uppercase: true, width: '70%' },
+    { id: 'field-2', label: 'Giới tính:', valueKey: 'gender' as keyof CCCDInfo, isBold: true, width: '30%' },
+    { id: 'field-3', label: '2. Ngày tháng năm sinh:', valueKey: 'dateOfBirth' as keyof CCCDInfo, isBold: true, width: '100%' },
+    { id: 'field-4', label: '3. Địa chỉ:', valueKey: 'permanentResidence' as keyof CCCDInfo, isBold: true, width: '100%' },
+    { id: 'field-5', label: '4. Tên cơ quan tuyển dụng:', isBold: true, width: '100%' },
+    { id: 'field-6', label: '5. Nơi đi lao động/học tập:', isBold: true, width: '100%' },
+  ]);
+  const [tableRows, setTableRows] = useState([
+    { id: 'row-1', tt: 1, label: "Chiều cao, cân nặng", result: "Cao: ............ cm / Nặng: ............ kg", doctor: "" },
+    { id: 'row-2', tt: 2, label: "Mạch, huyết áp", result: "Mạch: ............ l/p / HA: ............ mmHg", doctor: "" },
+    { id: 'row-3', tt: 3, label: "Khám Nội khoa (Tim, Phổi, Tiêu hóa, Thận...)", result: "", doctor: "" },
+    { id: 'row-4', tt: 4, label: "Khám Ngoại khoa, Da liễu, Cơ xương khớp", result: "", doctor: "" },
+    { id: 'row-5', tt: 5, label: "Khám Tai - Mũi - Họng", result: "", doctor: "" },
+    { id: 'row-6', tt: 6, label: "Khám Mắt (Thị lực, Bệnh về mắt)", result: "MP: ............ / MT: ............", doctor: "" },
+    { id: 'row-7', tt: 7, label: "Khám Răng - Hàm - Mặt", result: "", doctor: "" },
+    { id: 'row-8', tt: 8, label: "Điện tâm đồ (ECG)", result: "", doctor: "" },
+    { id: 'row-9', tt: 9, label: "X-Quang tim phổi thẳng", result: "", doctor: "" },
+    { id: 'row-10', tt: 10, label: "Siêu âm ổ bụng tổng quát", result: "", doctor: "" },
+    { id: 'row-11', tt: 11, label: "Xét nghiệm nước tiểu (Tổng phân tích)", result: "", doctor: "" },
+    { id: 'row-12', tt: 12, label: "Xét nghiệm máu (HIV, HBsAg, VDRL...)", result: "Nhóm máu: .............", doctor: "" },
+  ]);
   const [topProvinces, setTopProvinces] = useState(['Hà Nội', 'TP.HCM mở rộng', 'Đà Nẵng', 'Hải Phòng']);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEndFields = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setFormFields((items) => {
+        const oldIndex = items.findIndex((i) => i.id === active.id);
+        const newIndex = items.findIndex((i) => i.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  const handleDragEndRows = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setTableRows((items) => {
+        const oldIndex = items.findIndex((i) => i.id === active.id);
+        const newIndex = items.findIndex((i) => i.id === over.id);
+        const newItems = arrayMove(items, oldIndex, newIndex);
+        // Update TT (STT) after move
+        return newItems.map((item: any, idx) => ({ ...item, tt: idx + 1 }));
+      });
+    }
+  };
+
+  const addFormField = () => {
+    const newId = `field-${Date.now()}`;
+    setFormFields([...formFields, { id: newId, label: 'Trường mới:', isBold: true, width: '100%' }]);
+  };
+
+  const removeFormField = (id: string) => {
+    setFormFields(formFields.filter(f => f.id !== id));
+  };
+
+  const updateFormField = (id: string, updates: any) => {
+    setFormFields(formFields.map(f => f.id === id ? { ...f, ...updates } : f));
+  };
+
+  const addTableRow = () => {
+    const newId = `row-${Date.now()}`;
+    setTableRows([...tableRows, { id: newId, tt: tableRows.length + 1, label: "Nội dung mới", result: "" }]);
+  };
+
+  const removeTableRow = (id: string) => {
+    const newRows = tableRows.filter(r => r.id !== id);
+    setTableRows(newRows.map((r, idx) => ({ ...r, tt: idx + 1 })));
+  };
+
+  const updateTableRow = (id: string, updates: any) => {
+    setTableRows(tableRows.map(r => r.id === id ? { ...r, ...updates } : r));
+  };
 
   const maskIdNumber = (id: string) => {
     if (!id || id.length < 7) return id;
@@ -547,6 +654,22 @@ export default function App() {
     return formattedValue;
   };
 
+  const handleDownloadPDF = () => {
+    const element = document.getElementById('medical-form-to-print');
+    if (!element) return;
+
+    const opt = {
+      margin: 0,
+      filename: `Mau_Kham_Suc_Khoe_${selectedPersonIndex !== null ? results[selectedPersonIndex].fullName.replace(/\s+/g, '_') : 'Template'}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    // @ts-ignore
+    html2pdf().set(opt).from(element).save();
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-blue-100">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
@@ -569,25 +692,25 @@ export default function App() {
       </header>
 
       <main className="mx-auto px-2 py-4" style={{ width: '960px' }}>
-        <div className="flex flex-col lg:flex-row gap-4 items-start">
+        <div className="flex flex-col lg:flex-row gap-2 items-start">
           {/* Sidebar */}
-          <aside className="w-48 shrink-0 space-y-2">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <aside className="w-44 shrink-0 space-y-1.5">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <button 
                 onClick={() => setIsNguyenKhoiOpen(!isNguyenKhoiOpen)}
-                className="w-full flex items-center justify-between p-3 hover:bg-slate-50 transition-colors group"
+                className="w-full flex items-center justify-between p-1.5 hover:bg-slate-50 transition-colors group"
                 title={isNguyenKhoiOpen ? "Đóng tab NGUYÊN KHÔI" : "Mở tab NGUYÊN KHÔI"}
               >
-                <div className="flex items-center gap-2">
-                  <div className="bg-blue-100 p-1.5 rounded-lg group-hover:bg-blue-200 transition-colors">
-                    <Globe className="w-4 h-4 text-blue-600" />
+                <div className="flex items-center gap-1">
+                  <div className="bg-blue-100 p-0.5 rounded-lg group-hover:bg-blue-200 transition-colors">
+                    <Globe className="w-2.5 h-2.5 text-blue-600" />
                   </div>
-                  <span className="font-bold text-xs text-slate-700 uppercase tracking-wider">NGUYÊN KHÔI</span>
+                  <span className="font-bold text-[9px] text-slate-700 uppercase tracking-wider">NGUYÊN KHÔI</span>
                 </div>
                 {isNguyenKhoiOpen ? (
-                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                  <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
                 ) : (
-                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                  <ChevronRight className="w-2.5 h-2.5 text-slate-400" />
                 )}
               </button>
               
@@ -599,7 +722,7 @@ export default function App() {
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden bg-slate-50/50"
                   >
-                    <div className="p-1 space-y-1">
+                    <div className="p-0.5 space-y-0.5">
                       {['Tiếng Việt', 'Tiếng Trung', 'Tiếng Anh'].map((lang) => (
                         <button
                           key={lang}
@@ -614,9 +737,9 @@ export default function App() {
                               setShowMedicalForm(false);
                             }
                           }}
-                          className={`w-full text-left px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                          className={`w-full text-left px-2 py-1 rounded-lg text-[9px] font-medium transition-all ${
                             selectedLanguage === lang 
-                              ? 'bg-blue-600 text-white shadow-md shadow-blue-100' 
+                              ? 'bg-blue-600 text-white shadow-sm' 
                               : 'text-slate-600 hover:bg-white hover:text-blue-600'
                           }`}
                         >
@@ -629,22 +752,22 @@ export default function App() {
               </AnimatePresence>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <button 
                 onClick={() => setIsCty6789Open(!isCty6789Open)}
-                className="w-full flex items-center justify-between p-3 hover:bg-slate-50 transition-colors group"
+                className="w-full flex items-center justify-between p-1.5 hover:bg-slate-50 transition-colors group"
                 title={isCty6789Open ? "Đóng tab CTY 6789" : "Mở tab CTY 6789"}
               >
-                <div className="flex items-center gap-2">
-                  <div className="bg-blue-100 p-1.5 rounded-lg group-hover:bg-blue-200 transition-colors">
-                    <Building2 className="w-4 h-4 text-blue-600" />
+                <div className="flex items-center gap-1">
+                  <div className="bg-blue-100 p-0.5 rounded-lg group-hover:bg-blue-200 transition-colors">
+                    <Building2 className="w-2.5 h-2.5 text-blue-600" />
                   </div>
-                  <span className="font-bold text-xs text-slate-700 uppercase tracking-wider">CTY 6789</span>
+                  <span className="font-bold text-[9px] text-slate-700 uppercase tracking-wider">CTY 6789</span>
                 </div>
                 {isCty6789Open ? (
-                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                  <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
                 ) : (
-                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                  <ChevronRight className="w-2.5 h-2.5 text-slate-400" />
                 )}
               </button>
               
@@ -656,14 +779,14 @@ export default function App() {
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden bg-slate-50/50"
                   >
-                    <div className="p-1 space-y-1">
+                    <div className="p-0.5 space-y-0.5">
                       {['Mẫu A1', 'Mẫu A2', 'Mẫu A3', 'Mẫu A4', 'Mẫu A5'].map((model) => (
                         <button
                           key={model}
                           onClick={() => setSelectedModel(model)}
-                          className={`w-full text-left px-4 py-2 rounded-xl text-xs font-medium transition-all ${
+                          className={`w-full text-left px-2 py-1 rounded-lg text-[9px] font-medium transition-all ${
                             selectedModel === model 
-                              ? 'bg-blue-600 text-white shadow-md shadow-blue-100' 
+                              ? 'bg-blue-600 text-white shadow-sm' 
                               : 'text-slate-600 hover:bg-white hover:text-blue-600'
                           }`}
                         >
@@ -676,22 +799,22 @@ export default function App() {
               </AnimatePresence>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <button 
                 onClick={() => setIsLogoTabOpen(!isLogoTabOpen)}
-                className="w-full flex items-center justify-between p-3 hover:bg-slate-50 transition-colors group"
+                className="w-full flex items-center justify-between p-1.5 hover:bg-slate-50 transition-colors group"
                 title={isLogoTabOpen ? "Đóng tab LOGO" : "Mở tab LOGO"}
               >
-                <div className="flex items-center gap-2">
-                  <div className="bg-blue-100 p-1.5 rounded-lg group-hover:bg-blue-200 transition-colors">
-                    <ImageIcon className="w-4 h-4 text-blue-600" />
+                <div className="flex items-center gap-1">
+                  <div className="bg-blue-100 p-0.5 rounded-lg group-hover:bg-blue-200 transition-colors">
+                    <ImageIcon className="w-2.5 h-2.5 text-blue-600" />
                   </div>
-                  <span className="font-bold text-xs text-slate-700 uppercase tracking-wider">LOGO</span>
+                  <span className="font-bold text-[9px] text-slate-700 uppercase tracking-wider">LOGO</span>
                 </div>
                 {isLogoTabOpen ? (
-                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                  <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
                 ) : (
-                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                  <ChevronRight className="w-2.5 h-2.5 text-slate-400" />
                 )}
               </button>
               
@@ -703,13 +826,13 @@ export default function App() {
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden bg-slate-50/50"
                   >
-                    <div className="p-2 space-y-3">
+                    <div className="p-1 space-y-1.5">
                       {/* Custom Logo Upload */}
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Tải logo tùy chỉnh</label>
+                      <div className="space-y-0.5">
+                        <label className="text-[7px] font-bold text-slate-400 uppercase tracking-widest ml-1">Tải logo tùy chỉnh</label>
                         <div 
                           onClick={() => logoInputRef.current?.click()}
-                          className={`w-full border-2 border-dashed rounded-xl p-2 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all group ${
+                          className={`w-full border border-dashed rounded-lg p-1 flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-all group ${
                             customLogo ? 'border-blue-400 bg-blue-50/30' : 'border-slate-200 hover:border-blue-400 hover:bg-blue-50/30'
                           }`}
                         >
@@ -721,34 +844,34 @@ export default function App() {
                             className="hidden"
                           />
                           {customLogo ? (
-                            <div className="relative w-full aspect-square rounded-lg overflow-hidden border border-blue-200">
+                            <div className="relative w-full aspect-square rounded overflow-hidden border border-blue-200">
                               <img src={customLogo} alt="Custom Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setCustomLogo(null);
                                 }}
-                                className="absolute top-1 right-1 bg-red-500 text-white p-0.5 rounded-full shadow-sm"
+                                className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-full shadow-sm"
                                 title="Xóa logo tùy chỉnh"
                               >
-                                <X className="w-2 h-2" />
+                                <X className="w-1 h-1" />
                               </button>
                             </div>
                           ) : (
                             <>
-                              <Upload className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
-                              <span className="text-[9px] font-semibold text-slate-500">Chọn ảnh logo</span>
+                              <Upload className="w-2.5 h-2.5 text-slate-400 group-hover:text-blue-600" />
+                              <span className="text-[7px] font-semibold text-slate-500">Chọn ảnh logo</span>
                             </>
                           )}
                         </div>
                       </div>
 
-                      <div className="h-px bg-slate-200 mx-2" />
+                      <div className="h-px bg-slate-200 mx-1" />
 
                       {/* Preset Logos */}
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Logo có sẵn</label>
-                        <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-0.5">
+                        <label className="text-[7px] font-bold text-slate-400 uppercase tracking-widest ml-1">Logo có sẵn</label>
+                        <div className="grid grid-cols-4 gap-0.5">
                           {[
                             { id: 'logo1', url: 'https://ais-dev-l27ehl2nr5tn5nl6qkwq7y-487314014322.asia-southeast1.run.app/api/images/logo-mpuh.png', name: 'Logo MPUH' },
                             { id: 'logo2', url: 'https://picsum.photos/seed/clinic/100/100', name: 'Logo 2' },
@@ -761,9 +884,9 @@ export default function App() {
                                 setSelectedLogo(logo.url);
                                 setCustomLogo(null); // Clear custom if preset is selected
                               }}
-                              className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                              className={`relative aspect-square rounded overflow-hidden border transition-all ${
                                 selectedLogo === logo.url 
-                                  ? 'border-blue-600 ring-2 ring-blue-100' 
+                                  ? 'border-blue-600 ring-1 ring-blue-100' 
                                   : 'border-slate-200 hover:border-blue-300'
                               }`}
                               title={`Chọn ${logo.name}`}
@@ -776,8 +899,8 @@ export default function App() {
                               />
                               {selectedLogo === logo.url && (
                                 <div className="absolute inset-0 bg-blue-600/10 flex items-center justify-center">
-                                  <div className="bg-blue-600 text-white p-1 rounded-full">
-                                    <CheckCircle2 className="w-3 h-3" />
+                                  <div className="bg-blue-600 text-white p-0.5 rounded-full">
+                                    <CheckCircle2 className="w-1 h-1" />
                                   </div>
                                 </div>
                               )}
@@ -794,228 +917,180 @@ export default function App() {
 
           <div className="flex flex-col lg:flex-row gap-2 items-start flex-1">
             {showMedicalForm ? (
-              <section className="flex-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm overflow-y-auto custom-scrollbar" style={{ maxHeight: '80vh' }}>
-                <div className="flex items-center justify-between mb-6 border-b pb-4">
+              <section className="flex-1 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm overflow-y-auto custom-scrollbar" style={{ maxHeight: '85vh' }}>
+                <div className="flex items-center justify-between mb-3 border-b pb-2">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-800">Mẫu Khám Sức Khỏe (Tiếng Việt)</h2>
-                    <p className="text-xs text-slate-500">Chọn người từ danh sách để điền thông tin tự động</p>
+                    <h2 className="text-sm font-bold text-slate-800">Mẫu Khám Sức Khỏe</h2>
+                    <p className="text-[10px] text-slate-500">Chọn người từ danh sách để điền tự động</p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <select 
-                      className="text-xs border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="text-[10px] border border-slate-200 rounded-lg px-2 py-1 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       onChange={(e) => setSelectedPersonIndex(e.target.value === "" ? null : parseInt(e.target.value))}
                       value={selectedPersonIndex ?? ""}
                     >
                       <option value="">-- Chọn người --</option>
                       {results.map((r, i) => (
-                        <option key={i} value={i}>{r.fullName} - {r.idNumber}</option>
+                        <option key={i} value={i}>{r.fullName}</option>
                       ))}
                     </select>
                     <button 
-                      onClick={() => window.print()}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md shadow-blue-100"
-                      title="In biểu mẫu hiện tại"
+                      onClick={() => setIsEditingForm(!isEditingForm)}
+                      className={`flex items-center gap-1.5 px-3 py-1 ${isEditingForm ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-600 hover:bg-slate-700'} text-white text-[10px] font-bold rounded-lg transition-all shadow-md shadow-slate-100`}
                     >
-                      <Download className="w-3.5 h-3.5" />
-                      In biểu mẫu
+                      <Settings2 className="w-3 h-3" />
+                      {isEditingForm ? 'Lưu mẫu' : 'Chỉnh sửa mẫu'}
+                    </button>
+                    <button 
+                      onClick={() => window.print()}
+                      className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md shadow-blue-100"
+                    >
+                      <Download className="w-3 h-3" />
+                      In mẫu
+                    </button>
+                    <button 
+                      onClick={handleDownloadPDF}
+                      className="flex items-center gap-1.5 px-3 py-1 bg-red-600 text-white text-[10px] font-bold rounded-lg hover:bg-red-700 transition-all shadow-md shadow-red-100"
+                    >
+                      <FileText className="w-3 h-3" />
+                      Tải PDF
                     </button>
                     <button 
                       onClick={() => setShowMedicalForm(false)}
-                      className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
-                      title="Đóng biểu mẫu"
+                      className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
                     >
-                      <X className="w-5 h-5" />
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
                 {/* The Form Content (Matching PDF Page 1) */}
-                <div id="medical-form-to-print" className="bg-white border border-slate-300 p-8 shadow-inner mx-auto print:p-0 print:border-0 print:shadow-none" style={{ width: '210mm', minHeight: '297mm', fontFamily: 'Times New Roman, serif' }}>
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="flex items-center gap-3">
-                      {customLogo ? (
-                        <img 
-                          src={customLogo} 
-                          alt="Hospital Custom Logo" 
-                          className="w-16 h-16 object-contain rounded"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : selectedLogo ? (
-                        <img 
-                          src={selectedLogo} 
-                          alt="Hospital Logo" 
-                          className="w-12 h-12 object-contain rounded"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-xl">MP</div>
-                      )}
-                      <div>
-                        <h3 className="text-blue-700 font-bold text-sm leading-tight">MPUH</h3>
-                        <p className="text-[8px] text-blue-600 font-bold uppercase">Bệnh viện Đại học Y Dược</p>
-                        <p className="text-[6px] text-blue-500 uppercase">Medical and Pharmaceutical University Hospital</p>
+                <div id="medical-form-to-print" className="bg-white border border-slate-300 p-[20mm] shadow-inner mx-auto print:p-0 print:border-0 print:shadow-none relative" style={{ width: '210mm', minHeight: '297mm', fontFamily: '"Times New Roman", Times, serif', color: '#000' }}>
+                  {/* Official Header */}
+                  <div className="flex items-start mb-6">
+                    {/* Left: Logo & Number */}
+                    <div className="text-center w-[140px] flex-shrink-0">
+                      <div className="flex flex-col items-center gap-1 mb-1">
+                        {customLogo ? (
+                          <img src={customLogo} alt="Logo" className="w-14 h-14 object-contain" referrerPolicy="no-referrer" />
+                        ) : selectedLogo ? (
+                          <img src={selectedLogo} alt="Logo" className="w-14 h-14 object-contain" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-12 h-12 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-xl">MP</div>
+                        )}
                       </div>
+                      <p className="text-[10pt]">Số: .........../KHTH</p>
                     </div>
-                    <div className="border border-slate-800 px-4 py-1 text-xs font-bold">
-                      MẪU SONG NGỮ
-                    </div>
-                    <div className="text-[10px] space-y-1">
-                      <p>Số điện thoại: ................................</p>
+
+                    {/* Right: Title Section */}
+                    <div className="flex-1 text-center">
+                      <h1 className="text-[18pt] font-bold uppercase leading-tight">TÓM TẮT KẾT QUẢ KHÁM SỨC KHỎE</h1>
+                      <p className="text-[12pt] font-bold uppercase mt-1">(Dùng cho người đi lao động, học tập và công tác nước ngoài)</p>
+                      <p className="italic text-[10pt] mt-1">(Bản lưu tại Bệnh viện)</p>
                     </div>
                   </div>
 
-                  <div className="text-center mb-6">
-                    <p className="text-[10px]">Số: ..................../KHTH</p>
-                    <h1 className="text-base font-bold uppercase mt-2">TÓM TẮT KẾT QUẢ KHÁM SỨC KHỎE CỦA NGƯỜI</h1>
-                    <h1 className="text-base font-bold uppercase">ĐI LAO ĐỘNG, HỌC TẬP VÀ CÔNG TÁC NƯỚC NGOÀI</h1>
-                    <p className="italic text-xs font-bold">(Bản lưu tại BV ĐHYD)</p>
+                  {/* Photo Box 4x6 (Positioned below Logo/Số) */}
+                  <div className="absolute border border-black flex items-center justify-center text-center p-2 text-[10pt]" style={{ top: '40mm', left: '20mm', height: '200px', width: '140px' }}>
+                    Ảnh 4x6
                   </div>
 
-                  <div className="grid grid-cols-12 gap-y-3 text-sm mb-6">
-                    <div className="col-span-8 flex items-baseline gap-2">
-                      <span className="font-bold whitespace-nowrap">1. Họ và tên:</span>
-                      <span className="border-b border-dotted border-slate-400 flex-1 min-h-[1.5rem] px-2 text-blue-700 font-bold uppercase">
-                        {selectedPersonIndex !== null ? results[selectedPersonIndex].fullName : ""}
-                      </span>
-                    </div>
-                    <div className="col-span-4 flex items-baseline gap-2">
-                      <span className="font-bold whitespace-nowrap">Giới tính:</span>
-                      <span className="border-b border-dotted border-slate-400 flex-1 min-h-[1.5rem] px-2">
-                        {selectedPersonIndex !== null ? results[selectedPersonIndex].gender : ""}
-                      </span>
-                    </div>
-
-                    <div className="col-span-12 flex items-baseline gap-2">
-                      <span className="font-bold whitespace-nowrap">2. Ngày tháng năm sinh:</span>
-                      <span className="border-b border-dotted border-slate-400 flex-1 min-h-[1.5rem] px-2">
-                        {selectedPersonIndex !== null ? results[selectedPersonIndex].dateOfBirth : ""}
-                      </span>
-                    </div>
-
-                    <div className="col-span-12 flex items-baseline gap-2">
-                      <span className="font-bold whitespace-nowrap">3. Địa chỉ:</span>
-                      <span className="border-b border-dotted border-slate-400 flex-1 min-h-[1.5rem] px-2 text-xs">
-                        {selectedPersonIndex !== null ? results[selectedPersonIndex].permanentResidence : ""}
-                      </span>
-                    </div>
-
-                    <div className="col-span-12 flex items-baseline gap-2">
-                      <span className="font-bold whitespace-nowrap">4. Tên cơ quan tuyển dụng:</span>
-                      <span className="border-b border-dotted border-slate-400 flex-1 min-h-[1.5rem] px-2"></span>
-                    </div>
-
-                    <div className="col-span-12 flex items-baseline gap-2">
-                      <span className="font-bold whitespace-nowrap">5. Công nhân đi lao động tại:</span>
-                      <span className="border-b border-dotted border-slate-400 flex-1 min-h-[1.5rem] px-2"></span>
-                    </div>
-                  </div>
-
-                  <table className="w-full border-collapse border border-slate-800 text-[11px]">
-                    <thead>
-                      <tr>
-                        <th className="border border-slate-800 p-1 w-8">TT</th>
-                        <th className="border border-slate-800 p-1 w-1/3">NỘI DUNG KHÁM</th>
-                        <th className="border border-slate-800 p-1">KẾT QUẢ</th>
-                        <th className="border border-slate-800 p-1 w-24">BS KHÁM KÝ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="border border-slate-800 p-2 text-center">1</td>
-                        <td className="border border-slate-800 p-2">Chiều cao, cân nặng</td>
-                        <td className="border border-slate-800 p-2">
-                          Cao: ....................cm. / Nặng: ....................kg
-                        </td>
-                        <td className="border border-slate-800 p-2"></td>
-                      </tr>
-                      <tr>
-                        <td className="border border-slate-800 p-2 text-center">2</td>
-                        <td className="border border-slate-800 p-2">Mạch, huyết áp</td>
-                        <td className="border border-slate-800 p-2">
-                          Mạch: ....................l/p. / Huyết áp: ....................mmHg
-                        </td>
-                        <td className="border border-slate-800 p-2"></td>
-                      </tr>
-                      <tr>
-                        <td className="border border-slate-800 p-2 text-center">3</td>
-                        <td className="border border-slate-800 p-2">Khám Nội khoa (Tim, Phổi, NT, Bệnh Tiêu hóa, Bệnh Thận,....)</td>
-                        <td className="border border-slate-800 p-2"></td>
-                        <td className="border border-slate-800 p-2"></td>
-                      </tr>
-                      <tr>
-                        <td className="border border-slate-800 p-2 text-center">4</td>
-                        <td className="border border-slate-800 p-2">Khám Ngoại khoa - Da liễu - Tâm thần kinh - Cơ xương khớp....</td>
-                        <td className="border border-slate-800 p-2"></td>
-                        <td className="border border-slate-800 p-2"></td>
-                      </tr>
-                      <tr>
-                        <td className="border border-slate-800 p-2 text-center">5</td>
-                        <td className="border border-slate-800 p-2">Khám Tai - Mũi - Họng</td>
-                        <td className="border border-slate-800 p-2"></td>
-                        <td className="border border-slate-800 p-2"></td>
-                      </tr>
-                      <tr>
-                        <td className="border border-slate-800 p-2 text-center">6</td>
-                        <td className="border border-slate-800 p-2">Khám về Mắt</td>
-                        <td className="border border-slate-800 p-2">
-                          Thị lực: MP: .................... MT: ....................<br/>
-                          Bệnh về mắt: ............................................................
-                        </td>
-                        <td className="border border-slate-800 p-2"></td>
-                      </tr>
-                      <tr>
-                        <td className="border border-slate-800 p-2 text-center">7</td>
-                        <td className="border border-slate-800 p-2">Khám Răng - Hàm - Mặt</td>
-                        <td className="border border-slate-800 p-2"></td>
-                        <td className="border border-slate-800 p-2"></td>
-                      </tr>
-                      <tr>
-                        <td className="border border-slate-800 p-2 text-center">8</td>
-                        <td className="border border-slate-800 p-2">Khám Điện tâm đồ (điện tim)</td>
-                        <td className="border border-slate-800 p-2"></td>
-                        <td className="border border-slate-800 p-2"></td>
-                      </tr>
-                      <tr>
-                        <td className="border border-slate-800 p-2 text-center">9</td>
-                        <td className="border border-slate-800 p-2">Kết quả X-Quang tim phổi</td>
-                        <td className="border border-slate-800 p-2"></td>
-                        <td className="border border-slate-800 p-2"></td>
-                      </tr>
-                      <tr>
-                        <td className="border border-slate-800 p-2 text-center">10</td>
-                        <td className="border border-slate-800 p-2">Siêu âm ổ bụng tổng quát</td>
-                        <td className="border border-slate-800 p-2"></td>
-                        <td className="border border-slate-800 p-2"></td>
-                      </tr>
-                      <tr>
-                        <td className="border border-slate-800 p-2 text-center">11</td>
-                        <td className="border border-slate-800 p-2">Kết quả XN nước tiểu (thường quy, có thai sớm)</td>
-                        <td className="border border-slate-800 p-2"></td>
-                        <td className="border border-slate-800 p-2"></td>
-                      </tr>
-                      <tr>
-                        <td className="border border-slate-800 p-2 text-center">12</td>
-                        <td className="border border-slate-800 p-2">
-                          XN máu (HIV, HBsAg, VDRL...)<br/>
-                          Nhóm máu: <span className="inline-block w-12 h-5 border border-slate-800 ml-2"></span>
-                        </td>
-                        <td className="border border-slate-800 p-2"></td>
-                        <td className="border border-slate-800 p-2"></td>
-                      </tr>
-                    </tbody>
-                  </table>
-
-                  <div className="mt-4 text-[11px] space-y-4">
-                    <p className="font-bold">Tôi xác nhận rằng: <span className="font-normal italic">Người lao động này đủ/không đủ sức khỏe để làm việc (Nếu không đủ xin nêu lý do)</span></p>
-                    <p className="border-b border-dotted border-slate-400 w-full min-h-[1rem]"></p>
+                  <div className="flex flex-wrap gap-y-1 text-[12pt] mb-6 ml-[160px]">
+                    <DndContext 
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEndFields}
+                    >
+                      <SortableContext 
+                        items={formFields.map(f => f.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {formFields.map((field) => (
+                          <SortableFormField 
+                            key={field.id}
+                            field={field}
+                            isEditing={isEditingForm}
+                            onRemove={() => removeFormField(field.id)}
+                            onUpdate={(updates) => updateFormField(field.id, updates)}
+                            selectedPersonIndex={selectedPersonIndex}
+                            results={results}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
                     
-                    <div className="grid grid-cols-2 mt-8">
+                    {isEditingForm && (
+                      <button 
+                        onClick={addFormField}
+                        className="flex items-center gap-1 text-blue-600 text-[10pt] font-bold hover:text-blue-700 transition-colors mt-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Thêm trường thông tin
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <DndContext 
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEndRows}
+                    >
+                      <table className="w-full border-collapse border border-black text-[11pt]">
+                        <thead>
+                          <tr className="bg-slate-50">
+                            <th className="border border-black p-2 w-10 text-center">TT</th>
+                            <th className="border border-black p-2 w-[40%] text-center">NỘI DUNG KHÁM</th>
+                            <th className="border border-black p-2 text-center">KẾT QUẢ</th>
+                            <th className="border border-black p-2 w-32 text-center">BS KHÁM KÝ</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <SortableContext 
+                            items={tableRows.map(r => r.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {tableRows.map((row) => (
+                              <SortableTableRow 
+                                key={row.id}
+                                row={row}
+                                isEditing={isEditingForm}
+                                onRemove={() => removeTableRow(row.id)}
+                                onUpdate={(updates) => updateTableRow(row.id, updates)}
+                              />
+                            ))}
+                          </SortableContext>
+                        </tbody>
+                      </table>
+                    </DndContext>
+                    
+                    {isEditingForm && (
+                      <button 
+                        onClick={addTableRow}
+                        className="flex items-center gap-1 text-blue-600 text-[10pt] font-bold hover:text-blue-700 transition-colors mt-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Thêm hàng mới
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="mt-6 text-[12pt] space-y-6">
+                    <div>
+                      <p className="font-bold">KẾT LUẬN: <span className="font-normal italic">Đủ sức khỏe / Không đủ sức khỏe để làm việc.</span></p>
+                      <p className="mt-2">Lý do (nếu không đủ): ....................................................................................................................................</p>
+                      <p className="border-b border-dotted border-black w-full min-h-[1.5rem] mt-1"></p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 mt-12">
                       <div className="text-center">
-                        <p className="font-bold uppercase">GIÁM ĐỐC BỆNH VIỆN</p>
+                        <p className="font-bold uppercase mb-20">GIÁM ĐỐC BỆNH VIỆN</p>
+                        <p className="font-bold">(Ký tên, đóng dấu)</p>
                       </div>
                       <div className="text-center">
-                        <p className="italic">Hà Nội, Ngày ....... tháng ....... năm .......</p>
-                        <p className="font-bold uppercase mt-1">KT.TRƯỞNG PHÒNG KHTH</p>
+                        <p className="italic mb-2">Hà Nội, ngày ....... tháng ....... năm .......</p>
+                        <p className="font-bold uppercase mb-20">KT. TRƯỞNG PHÒNG KHTH</p>
+                        <p className="font-bold">BS. ........................................</p>
                       </div>
                     </div>
                   </div>
@@ -1038,20 +1113,28 @@ export default function App() {
                       onChange={handleImageUpload}
                       accept="image/*"
                       multiple
+                      className="hidden"
                     />
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full bg-slate-50 border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-200 font-bold py-1 rounded-xl transition-all flex items-center justify-center gap-1.5 text-[9px]"
+                    >
+                      <Upload className="w-2.5 h-2.5" />
+                      Chọn tệp
+                    </button>
                   </div>
                   
                   <div 
                     onClick={startCamera}
-                    className="w-full border-2 border-dashed border-slate-200 rounded-xl p-2 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all group"
-                    style={{ height: '41px' }}
+                    className="w-full border-2 border-dashed border-slate-200 rounded-xl p-1.5 flex flex-col items-center justify-center gap-0.5 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all group"
+                    style={{ height: '36px' }}
                     title="Mở camera để chụp ảnh CCCD"
                   >
-                    <div className="bg-slate-100 p-1 rounded-full group-hover:bg-blue-100 transition-colors">
-                      <Camera className="w-3 h-3 text-slate-400 group-hover:text-blue-600" />
+                    <div className="bg-slate-100 p-0.5 rounded-full group-hover:bg-blue-100 transition-colors">
+                      <Camera className="w-2.5 h-2.5 text-slate-400 group-hover:text-blue-600" />
                     </div>
                     <div className="text-center">
-                      <p className="font-semibold text-slate-700 text-[9px]">Chụp ảnh từ Camera</p>
+                      <p className="font-semibold text-slate-700 text-[8px]">Chụp ảnh từ Camera</p>
                     </div>
                   </div>
                 </div>
@@ -1061,20 +1144,20 @@ export default function App() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     onClick={extractInfo}
-                    className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold py-2 rounded-xl shadow-md shadow-blue-200 transition-all flex items-center justify-center gap-2 text-xs border border-blue-400/30"
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold py-1.5 rounded-xl shadow-md shadow-blue-200 transition-all flex items-center justify-center gap-1.5 text-[10px] border border-blue-400/30"
                     title="Bắt đầu trích xuất thông tin từ ảnh đã chọn"
                   >
-                    <FileText className="w-3.5 h-3.5" />
+                    <FileText className="w-3 h-3" />
                     Trích xuất
                   </motion.button>
                 )}
 
                 <button
                   onClick={() => setIsManualFormOpen(true)}
-                  className="w-full bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-200 font-bold py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-[10px]"
+                  className="w-full bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-200 font-bold py-1.5 rounded-xl transition-all flex items-center justify-center gap-1.5 text-[9px]"
                   title="Tự thêm thông tin thủ công"
                 >
-                  <Plus className="w-3 h-3" />
+                  <Plus className="w-2.5 h-2.5" />
                   Thêm thủ công
                 </button>
 
@@ -1169,14 +1252,14 @@ export default function App() {
                 <table className="w-auto text-left border-collapse table-auto">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      <th className="px-0 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter w-5 text-center">STT</th>
-                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Số CCCD</th>
-                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Ngày cấp</th>
-                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Họ và tên</th>
-                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Ngày sinh</th>
-                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Giới tính</th>
-                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Thường trú</th>
-                      <th className="px-0.5 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter w-14 text-center">Thao tác</th>
+                      <th className="px-0.5 py-0 text-[7px] font-bold text-slate-400 uppercase tracking-tighter w-4 text-center">STT</th>
+                      <th className="px-0.5 py-0 text-[7px] font-bold text-slate-400 uppercase tracking-tighter">Số CCCD</th>
+                      <th className="px-0.5 py-0 text-[7px] font-bold text-slate-400 uppercase tracking-tighter">Ngày cấp</th>
+                      <th className="px-0.5 py-0 text-[7px] font-bold text-slate-400 uppercase tracking-tighter">Họ và tên</th>
+                      <th className="px-0.5 py-0 text-[7px] font-bold text-slate-400 uppercase tracking-tighter">Ngày sinh</th>
+                      <th className="px-0.5 py-0 text-[7px] font-bold text-slate-400 uppercase tracking-tighter">Giới tính</th>
+                      <th className="px-0.5 py-0 text-[7px] font-bold text-slate-400 uppercase tracking-tighter">Thường trú</th>
+                      <th className="px-0.5 py-0 text-[7px] font-bold text-slate-400 uppercase tracking-tighter w-10 text-center">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -1199,113 +1282,113 @@ export default function App() {
                               }}
                               className={`transition-all duration-500 group ${isEditing ? 'bg-blue-50/30' : (isDuplicate ? 'border-l-4 border-l-red-500 bg-red-50/50' : 'hover:bg-blue-50/30')}`}
                             >
-                              <td className="px-0 py-0.5 text-xs font-bold text-slate-400 text-center">
+                              <td className="px-0.5 py-0 text-[9px] font-bold text-slate-400 text-center">
                                 {index + 1}
                               </td>
-                              <td className="px-0.5 py-0.5 text-xs text-slate-700 font-medium whitespace-nowrap">
+                              <td className="px-0.5 py-0 text-[9px] text-slate-700 font-medium whitespace-nowrap">
                                 {isEditing ? (
                                   <input 
                                     type="text" 
                                     value={editData?.idNumber} 
                                     onChange={(e) => handleEditChange('idNumber', e.target.value)}
-                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-blue-500"
+                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0 text-[9px] focus:outline-none focus:border-blue-500"
                                   />
                                 ) : maskIdNumber(item.idNumber)}
                                 {fieldErrors[`idNumber_${index}`] && (
-                                  <div className="text-[8px] text-red-500 font-bold mt-0.5">{fieldErrors[`idNumber_${index}`]}</div>
+                                  <div className="text-[6px] text-red-500 font-bold mt-0">{fieldErrors[`idNumber_${index}`]}</div>
                                 )}
                               </td>
-                              <td className="px-0.5 py-0.5 text-xs text-slate-600 whitespace-nowrap">
+                              <td className="px-0.5 py-0 text-[9px] text-slate-600 whitespace-nowrap">
                                 {isEditing ? (
                                   <input 
                                     type="text" 
                                     value={editData?.issueDate} 
                                     onChange={(e) => handleEditChange('issueDate', e.target.value)}
-                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-blue-500"
+                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0 text-[9px] focus:outline-none focus:border-blue-500"
                                   />
                                 ) : (item.issueDate || "Không có")}
                                 {fieldErrors[`issueDate_${index}`] && (
-                                  <div className="text-[8px] text-red-500 font-bold mt-0.5">
+                                  <div className="text-[6px] text-red-500 font-bold mt-0">
                                     {fieldErrors[`issueDate_${index}`] === "Định dạng ngày phải là DD/MM/YYYY" ? "Không có" : fieldErrors[`issueDate_${index}`]}
                                   </div>
                                 )}
                               </td>
-                              <td className="px-0.5 py-0.5 text-xs text-slate-900 font-bold uppercase whitespace-nowrap">
+                              <td className="px-0.5 py-0 text-[9px] text-slate-900 font-bold uppercase whitespace-nowrap">
                                 {isEditing ? (
                                   <input 
                                     type="text" 
                                     value={editData?.fullName} 
                                     onChange={(e) => handleEditChange('fullName', e.target.value)}
-                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-blue-500 uppercase"
+                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0 text-[9px] focus:outline-none focus:border-blue-500 uppercase"
                                   />
                                 ) : item.fullName}
                               </td>
-                              <td className="px-0.5 py-0.5 text-xs text-slate-600 whitespace-nowrap">
+                              <td className="px-0.5 py-0 text-[9px] text-slate-600 whitespace-nowrap">
                                 {isEditing ? (
                                   <input 
                                     type="text" 
                                     value={editData?.dateOfBirth} 
                                     onChange={(e) => handleEditChange('dateOfBirth', e.target.value)}
-                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-blue-500"
+                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0 text-[9px] focus:outline-none focus:border-blue-500"
                                   />
                                 ) : item.dateOfBirth}
                                 {fieldErrors[`dateOfBirth_${index}`] && (
-                                  <div className="text-[8px] text-red-500 font-bold mt-0.5">{fieldErrors[`dateOfBirth_${index}`]}</div>
+                                  <div className="text-[6px] text-red-500 font-bold mt-0">{fieldErrors[`dateOfBirth_${index}`]}</div>
                                 )}
                               </td>
-                              <td className="px-0.5 py-0.5 text-xs text-slate-600 whitespace-nowrap">
+                              <td className="px-0.5 py-0 text-[9px] text-slate-600 whitespace-nowrap">
                                 {isEditing ? (
                                   <select 
                                     value={editData?.gender} 
                                     onChange={(e) => handleEditChange('gender', e.target.value)}
-                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-blue-500"
+                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0 text-[9px] focus:outline-none focus:border-blue-500"
                                   >
                                     <option value="Nam">Nam</option>
                                     <option value="Nữ">Nữ</option>
                                   </select>
                                 ) : item.gender}
                               </td>
-                              <td className="px-0.5 py-0.5 text-xs text-slate-600 truncate" title={displayItem.permanentResidence}>
+                              <td className="px-0.5 py-0 text-[9px] text-slate-600 truncate" title={displayItem.permanentResidence}>
                                 {isEditing ? (
                                   <input 
                                     type="text" 
                                     value={editData?.permanentResidence} 
                                     onChange={(e) => handleEditChange('permanentResidence', e.target.value)}
-                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-blue-500"
+                                    className="w-full bg-white border border-blue-200 rounded px-1 py-0 text-[9px] focus:outline-none focus:border-blue-500"
                                   />
                                 ) : getProvinceOnly(item.permanentResidence)}
                               </td>
-                              <td className="px-0.5 py-0.5 text-center">
+                              <td className="px-0.5 py-0 text-center">
                                 <div className="flex items-center justify-center gap-0.5">
                                   {isEditing ? (
                                     <>
                                       <button 
                                         onClick={saveEdit}
-                                        className="p-1 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                                        className="p-0.5 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
                                         title="Lưu"
                                       >
-                                        <Save className="w-3 h-3" />
+                                        <Save className="w-2 h-2" />
                                       </button>
                                       <button 
                                         onClick={cancelEditing}
-                                        className="p-1 bg-slate-400 text-white rounded hover:bg-slate-500 transition-colors"
+                                        className="p-0.5 bg-slate-400 text-white rounded hover:bg-slate-500 transition-colors"
                                         title="Hủy"
                                       >
-                                        <X className="w-3 h-3" />
+                                        <X className="w-2 h-2" />
                                       </button>
                                     </>
                                   ) : (
                                     <>
                                       <button 
                                         onClick={() => startEditing(index)}
-                                        className="p-1 bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                        className="p-0.5 bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                                         title="Sửa"
                                       >
-                                        <Edit3 className="w-3 h-3" />
+                                        <Edit3 className="w-2 h-2" />
                                       </button>
                                       <button 
                                         onClick={() => copyToClipboard(lineText, index)}
-                                        className={`p-1 rounded-lg transition-all ${
+                                        className={`p-0.5 rounded-lg transition-all ${
                                           copySuccess === index 
                                             ? 'bg-green-100 text-green-600' 
                                             : 'bg-white text-slate-400 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 opacity-0 group-hover:opacity-100'
@@ -1313,17 +1396,17 @@ export default function App() {
                                         title="Copy hàng này"
                                       >
                                         {copySuccess === index ? (
-                                          <CheckCircle2 className="w-3 h-3" />
+                                          <CheckCircle2 className="w-2.5 h-2.5" />
                                         ) : (
-                                          <FileText className="w-3 h-3" />
+                                          <FileText className="w-2.5 h-2.5" />
                                         )}
                                       </button>
                                       <button 
                                         onClick={() => setItemToDelete(index)}
-                                        className="p-1 bg-white text-slate-400 hover:text-red-600 hover:bg-red-50 border border-slate-200 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                        className="p-0.5 bg-white text-slate-400 hover:text-red-600 hover:bg-red-50 border border-slate-200 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                                         title="Xóa hàng này"
                                       >
-                                        <X className="w-3 h-3" />
+                                        <X className="w-2.5 h-2.5" />
                                       </button>
                                     </>
                                   )}
@@ -1370,26 +1453,26 @@ export default function App() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 max-w-md w-full"
+              className="bg-white rounded-xl shadow-2xl border border-slate-200 p-3 max-w-[420px] w-full"
             >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="bg-blue-100 p-2 rounded-full">
-                    <Plus className="w-6 h-6 text-blue-600" />
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="bg-blue-100 p-1 rounded-full">
+                    <Plus className="w-4 h-4 text-blue-600" />
                   </div>
-                  <h3 className="text-lg font-bold">Thêm thông tin thủ công</h3>
+                  <h3 className="text-sm font-bold">Thêm thông tin thủ công</h3>
                 </div>
                 <button 
                   onClick={() => setIsManualFormOpen(false)}
-                  className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              <form onSubmit={handleManualSubmit} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Họ và tên</label>
+              <form onSubmit={handleManualSubmit} className="space-y-1.5">
+                <div className="space-y-0.5">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Họ và tên</label>
                   <input 
                     type="text" 
                     required
@@ -1398,13 +1481,13 @@ export default function App() {
                     value={manualFormData.fullName}
                     onChange={(e) => setManualFormData({...manualFormData, fullName: e.target.value.toUpperCase()})}
                     placeholder="NGUYỄN VĂN A"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Ngày sinh</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Ngày sinh</label>
                     <input 
                       type="text" 
                       required
@@ -1414,15 +1497,15 @@ export default function App() {
                       onChange={(e) => setManualFormData({...manualFormData, dateOfBirth: handleDateInput(e.target.value)})}
                       placeholder="DD/MM/YYYY"
                       maxLength={10}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Giới tính</label>
+                  <div className="space-y-0.5">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Giới tính</label>
                     <select 
                       value={manualFormData.gender}
                       onChange={(e) => setManualFormData({...manualFormData, gender: e.target.value})}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="Nam">Nam</option>
                       <option value="Nữ">Nữ</option>
@@ -1430,21 +1513,21 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Thường trú</label>
+                <div className="flex gap-2">
+                  <div className="space-y-0.5" style={{ width: '140px' }}>
+                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Thường trú</label>
                     <textarea 
                       value={manualFormData.permanentResidence}
                       onChange={(e) => setManualFormData({...manualFormData, permanentResidence: e.target.value})}
-                      placeholder="Số nhà, đường, phường/xã, quận/huyện"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                      placeholder="Số nhà, đường..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[70px] resize-none"
                     />
                   </div>
-                  <div className="space-y-1 flex flex-col">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Tỉnh thành</label>
-                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col gap-3">
+                  <div className="space-y-0.5 flex flex-col flex-1">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Tỉnh thành</label>
+                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-1.5 flex flex-col gap-1.5" style={{ width: '200px', paddingLeft: '6px' }}>
                       {/* Top Tags */}
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1">
                         {topProvinces.map(p => (
                           <button
                             key={p}
@@ -1453,7 +1536,7 @@ export default function App() {
                               setSelectedProvince(p);
                               setProvinceSearch(p);
                             }}
-                            className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                            className={`px-1 py-0.5 rounded text-[8px] font-bold transition-all ${
                               selectedProvince === p 
                                 ? 'bg-blue-600 text-white shadow-sm' 
                                 : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
@@ -1466,28 +1549,26 @@ export default function App() {
 
                       {/* Search Input */}
                       <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <Search className="absolute left-1.5 top-1/2 -translate-y-1/2 w-2.5 h-2.5 text-slate-400" />
                         <input 
                           type="text"
                           value={provinceSearch}
                           onChange={(e) => {
                             setProvinceSearch(e.target.value);
-                            // If user types something that matches exactly, select it
                             const match = PROVINCES.find(p => p.toLowerCase() === e.target.value.toLowerCase());
                             if (match) setSelectedProvince(match);
                           }}
-                          placeholder="Tìm tỉnh thành..."
-                          className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Tìm tỉnh..."
+                          className="w-full bg-white border border-slate-200 rounded-md pl-5 pr-1.5 py-0.5 text-[9px] focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
 
                       {/* Filtered List */}
-                      <div className="flex-1 overflow-y-auto max-h-[120px] pr-1 custom-scrollbar">
-                        <div className="flex flex-col gap-1">
+                      <div className="flex-1 overflow-y-auto max-h-[60px] pr-1 custom-scrollbar">
+                        <div className="flex flex-col gap-0.5">
                           {PROVINCES.filter(p => 
                             p.toLowerCase().includes(provinceSearch.toLowerCase())
                           ).sort((a, b) => {
-                            // Prioritize those in topProvinces
                             const aIndex = topProvinces.indexOf(a);
                             const bIndex = topProvinces.indexOf(b);
                             if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
@@ -1502,7 +1583,7 @@ export default function App() {
                                 setSelectedProvince(p);
                                 setProvinceSearch(p);
                               }}
-                              className={`text-left px-3 py-1.5 rounded-lg text-xs transition-all ${
+                              className={`text-left px-1.5 py-0.5 rounded text-[9px] transition-all ${
                                 selectedProvince === p
                                   ? 'bg-blue-50 text-blue-600 font-bold'
                                   : 'hover:bg-slate-100 text-slate-600'
@@ -1517,18 +1598,19 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-2 pt-1">
                   <button 
                     type="button"
                     onClick={() => setIsManualFormOpen(false)}
-                    className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+                    className="flex-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-[10px] transition-colors"
                   >
                     Hủy
                   </button>
                   <button 
                     type="submit"
-                    className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-100 transition-colors"
+                    className="flex-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-[10px] shadow-md shadow-blue-100 transition-colors flex items-center justify-center gap-1"
                   >
+                    <Plus className="w-3 h-3" />
                     Thêm vào danh sách
                   </button>
                 </div>
@@ -1679,5 +1761,196 @@ function Field({
         )}
       </div>
     </div>
+  );
+}
+
+function SortableFormField({ 
+  field, 
+  isEditing, 
+  onRemove, 
+  onUpdate,
+  selectedPersonIndex,
+  results
+}: { 
+  field: any; 
+  isEditing: boolean; 
+  onRemove: () => void;
+  onUpdate: (updates: any) => void;
+  selectedPersonIndex: number | null;
+  results: CCCDInfo[];
+  key?: React.Key;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: field.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const displayValue = field.valueKey && selectedPersonIndex !== null 
+    ? results[selectedPersonIndex][field.valueKey as keyof CCCDInfo] 
+    : "";
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      className={`flex items-baseline gap-2 group relative ${isEditing ? 'hover:bg-blue-50/50 rounded p-1 -m-1' : ''}`}
+      style={{ ...style, height: '24px', width: field.width || '100%' }}
+    >
+      {isEditing && (
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-slate-300 hover:text-blue-500">
+          <GripVertical className="w-3 h-3" />
+        </div>
+      )}
+      
+      {isEditing ? (
+        <input 
+          type="text" 
+          value={field.label} 
+          onChange={(e) => onUpdate({ label: e.target.value })}
+          className="font-bold whitespace-nowrap bg-transparent border-b border-blue-200 focus:outline-none focus:border-blue-500 text-[12pt]"
+          style={{ width: 'auto', minWidth: '100px' }}
+        />
+      ) : (
+        <span className={`${field.isBold ? 'font-bold' : ''} whitespace-nowrap`}>{field.label}</span>
+      )}
+
+      <span className={`border-b border-dotted border-black flex-1 min-h-[1.5rem] px-2 ${field.uppercase ? 'uppercase' : ''} ${field.valueKey === 'fullName' ? 'text-blue-800 font-bold text-[13pt]' : ''}`}>
+        {displayValue}
+      </span>
+
+      {isEditing && (
+        <button 
+          onClick={onRemove}
+          className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition-all"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SortableTableRow({ 
+  row, 
+  isEditing, 
+  onRemove, 
+  onUpdate 
+}: { 
+  row: any; 
+  isEditing: boolean; 
+  onRemove: () => void;
+  onUpdate: (updates: any) => void;
+  key?: React.Key;
+}) {
+  const [tempDoctor, setTempDoctor] = useState(row.doctor || "");
+  const isDoctorDirty = tempDoctor !== (row.doctor || "");
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: row.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const handleSaveDoctor = () => {
+    onUpdate({ doctor: tempDoctor });
+  };
+
+  const handleCancelDoctor = () => {
+    setTempDoctor(row.doctor || "");
+  };
+
+  // Sync tempDoctor when row.doctor changes externally (e.g. from state reset)
+  React.useEffect(() => {
+    setTempDoctor(row.doctor || "");
+  }, [row.doctor]);
+
+  return (
+    <tr ref={setNodeRef} style={style} className={isDragging ? 'bg-blue-50' : ''}>
+      <td className="border border-black p-2 text-center font-bold relative">
+        {isEditing && (
+          <div {...attributes} {...listeners} className="absolute left-0 top-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing p-0.5 text-slate-300 hover:text-blue-500">
+            <GripVertical className="w-3 h-3" />
+          </div>
+        )}
+        {row.tt}
+      </td>
+      <td className="border border-black p-2">
+        {isEditing ? (
+          <input 
+            type="text" 
+            value={row.label} 
+            onChange={(e) => onUpdate({ label: e.target.value })}
+            className="w-full bg-transparent border-b border-blue-200 focus:outline-none focus:border-blue-500"
+          />
+        ) : row.label}
+      </td>
+      <td className="border border-black p-2 italic text-slate-400">
+        {isEditing ? (
+          <input 
+            type="text" 
+            value={row.result} 
+            onChange={(e) => onUpdate({ result: e.target.value })}
+            className="w-full bg-transparent border-b border-blue-200 focus:outline-none focus:border-blue-500"
+          />
+        ) : row.result}
+      </td>
+      <td className="border border-black p-2 relative">
+        <div className="flex flex-col gap-1">
+          <input 
+            type="text" 
+            value={tempDoctor} 
+            onChange={(e) => setTempDoctor(e.target.value)}
+            placeholder="BS..."
+            className={`w-full bg-transparent text-xs focus:outline-none ${isDoctorDirty ? 'border-b border-blue-400' : ''}`}
+          />
+          {isDoctorDirty && (
+            <div className="flex gap-1 justify-end">
+              <button 
+                onClick={handleSaveDoctor}
+                className="p-0.5 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                title="Lưu BS"
+              >
+                <CheckCircle2 className="w-2.5 h-2.5" />
+              </button>
+              <button 
+                onClick={handleCancelDoctor}
+                className="p-0.5 bg-slate-400 text-white rounded hover:bg-slate-500 transition-colors"
+                title="Hủy"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          )}
+        </div>
+        {isEditing && (
+          <button 
+            onClick={onRemove}
+            className="absolute -right-6 top-1/2 -translate-y-1/2 p-1 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        )}
+      </td>
+    </tr>
   );
 }
