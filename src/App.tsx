@@ -230,26 +230,26 @@ export default function App() {
   }, []);
 
   const [formFields, setFormFields] = useState([
-    { id: 'field-1', label: '1. Họ và tên:', valueKey: 'fullName' as keyof CCCDInfo, isBold: true, uppercase: true, width: '70%' },
-    { id: 'field-2', label: 'Giới tính:', valueKey: 'gender' as keyof CCCDInfo, isBold: true, uppercase: true, width: '30%' },
-    { id: 'field-3', label: '2. Ngày tháng năm sinh:', valueKey: 'dateOfBirth' as keyof CCCDInfo, isBold: true, width: '100%' },
-    { id: 'field-4', label: '3. Địa chỉ:', valueKey: 'permanentResidence' as keyof CCCDInfo, isBold: true, uppercase: true, width: '100%' },
-    { id: 'field-5', label: '4. Tên cơ quan tuyển dụng:', isBold: true, width: '100%' },
-    { id: 'field-6', label: '5. Nơi đi lao động/học tập:', isBold: true, width: '100%' },
+    { id: 'field-1', label: 'Họ và tên:', valueKey: 'fullName' as keyof CCCDInfo, isBold: true, uppercase: true, width: '70%' },
+    { id: 'field-2', label: 'Giới tính:', valueKey: 'gender' as keyof CCCDInfo, defaultValue: 'Nam', isBold: true, width: '30%' },
+    { id: 'field-3', label: 'Ngày tháng năm sinh:', valueKey: 'dateOfBirth' as keyof CCCDInfo, isBold: true, width: '100%' },
+    { id: 'field-4', label: 'Địa chỉ:', valueKey: 'permanentResidence' as keyof CCCDInfo, isBold: true, width: '100%' },
+    { id: 'field-5', label: 'Tên cơ quan tuyển dụng:', defaultValue: 'CTY NGUYÊN KHÔI', isBold: true, width: '100%' },
+    { id: 'field-6', label: 'Công nhân đi lao động tại:', defaultValue: 'TRUNG QUỐC', isBold: true, width: '100%' },
   ]);
   const [tableRows, setTableRows] = useState([
-    { id: 'row-1', tt: 1, label: "Chiều cao, cân nặng", result: "Cao: ............ cm / Nặng: ............ kg", doctor: "" },
-    { id: 'row-2', tt: 2, label: "Mạch, huyết áp", result: "Mạch: ............ l/p / HA: ............ mmHg", doctor: "" },
-    { id: 'row-3', tt: 3, label: "Khám Nội khoa (Tim, Phổi, Tiêu hóa, Thận...)", result: "", doctor: "" },
-    { id: 'row-4', tt: 4, label: "Khám Ngoại khoa, Da liễu, Cơ xương khớp", result: "", doctor: "" },
+    { id: 'row-1', tt: 1, label: "Chiều cao, cân nặng", result: "Cao: ........ cm. / Nặng: ........ kg", doctor: "" },
+    { id: 'row-2', tt: 2, label: "Mạch, huyết áp", result: "Mạch: ........ l/p. / Huyết áp: ........ mmHg", doctor: "" },
+    { id: 'row-3', tt: 3, label: "Khám Nội khoa (Tim, Phổi, NT, Bệnh Tiêu hóa, Bệnh Thận,....)", result: "", doctor: "" },
+    { id: 'row-4', tt: 4, label: "Khám Ngoại khoa - Da liễu - Tâm thần kinh - Cơ xương khớp....", result: "", doctor: "" },
     { id: 'row-5', tt: 5, label: "Khám Tai - Mũi - Họng", result: "", doctor: "" },
-    { id: 'row-6', tt: 6, label: "Khám Mắt (Thị lực, Bệnh về mắt)", result: "MP: ............ / MT: ............", doctor: "" },
+    { id: 'row-6', tt: 6, label: "Khám về Mắt", result: "Thị lực: MP: ........ MT: ........ \nBệnh về mắt: ........", doctor: "" },
     { id: 'row-7', tt: 7, label: "Khám Răng - Hàm - Mặt", result: "", doctor: "" },
-    { id: 'row-8', tt: 8, label: "Điện tâm đồ (ECG)", result: "", doctor: "" },
-    { id: 'row-9', tt: 9, label: "X-Quang tim phổi thẳng", result: "", doctor: "" },
+    { id: 'row-8', tt: 8, label: "Khám Điện tâm đồ (điện tim)", result: "", doctor: "" },
+    { id: 'row-9', tt: 9, label: "Kết quả X-Quang tim phổi", result: "", doctor: "" },
     { id: 'row-10', tt: 10, label: "Siêu âm ổ bụng tổng quát", result: "", doctor: "" },
-    { id: 'row-11', tt: 11, label: "Xét nghiệm nước tiểu (Tổng phân tích)", result: "", doctor: "" },
-    { id: 'row-12', tt: 12, label: "Xét nghiệm máu (HIV, HBsAg, VDRL...)", result: "Nhóm máu: .............", doctor: "" },
+    { id: 'row-11', tt: 11, label: "Kết quả XN nước tiểu (thường quy, có thai sớm)", result: "", doctor: "" },
+    { id: 'row-12', tt: 12, label: "XN máu (HIV, HBsAg, VDRL...)", result: "Nhóm máu: [ ]", doctor: "" },
   ]);
   const [topProvinces, setTopProvinces] = useState(['Hà Nội', 'TP.HCM mở rộng', 'Đà Nẵng', 'Hải Phòng']);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -885,17 +885,17 @@ export default function App() {
     element.classList.add('pdf-mode');
 
     const opt = {
-      margin: [0, 0, 0, 0],
+      margin: 0,
       filename: `Mau_Kham_Suc_Khoe_${selectedPersonIndex !== null ? results[selectedPersonIndex].fullName.replace(/\s+/g, '_') : 'Template'}.pdf`,
-      image: { type: 'jpeg', quality: 1.0 },
+      image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
-        scale: 3, 
+        scale: 2, 
         useCORS: true, 
         logging: false, 
         letterRendering: true,
-        windowWidth: 794 // 210mm at 96dpi
+        windowWidth: 1200
       },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     };
 
@@ -912,16 +912,16 @@ export default function App() {
     element.classList.add('pdf-mode');
 
     const opt = {
-      margin: [0, 0, 0, 0],
-      image: { type: 'jpeg', quality: 1.0 },
+      margin: 0,
+      image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
-        scale: 3, 
+        scale: 2, 
         useCORS: true, 
         logging: false, 
         letterRendering: true,
-        windowWidth: 794
+        windowWidth: 1200
       },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     };
 
@@ -1216,20 +1216,15 @@ export default function App() {
 
           <div className="flex flex-col lg:flex-row gap-2 items-start flex-1">
             {showMedicalForm ? (
-              <section className="flex-1 bg-slate-100 p-4 rounded-2xl border border-slate-200 shadow-inner overflow-y-auto custom-scrollbar" style={{ maxHeight: '85vh' }}>
-                <div className="flex items-center justify-between mb-4 sticky top-0 z-20 bg-slate-100/80 backdrop-blur-sm py-2">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-200">
-                      <FileText className="text-blue-600 w-5 h-5" />
-                    </div>
-                    <div>
-                      <h2 className="font-bold text-slate-800">Xem trước biểu mẫu</h2>
-                      <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">2 Trang: Khám sức khỏe & ECG</p>
-                    </div>
+              <section className="flex-1 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm overflow-y-auto custom-scrollbar" style={{ maxHeight: '85vh' }}>
+                <div className="flex items-center justify-between mb-3 border-b pb-2">
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-800">Mẫu Khám Sức Khỏe</h2>
+                    <p className="text-[10px] text-slate-500">Chọn người từ danh sách để điền tự động</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <select 
-                      className="text-[10px] border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="text-[10px] border border-slate-200 rounded-lg px-2 py-1 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       onChange={(e) => setSelectedPersonIndex(e.target.value === "" ? null : parseInt(e.target.value))}
                       value={selectedPersonIndex ?? ""}
                     >
@@ -1240,254 +1235,256 @@ export default function App() {
                     </select>
                     <button 
                       onClick={() => setIsEditingForm(!isEditingForm)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        isEditingForm 
-                          ? 'bg-blue-600 text-white shadow-md shadow-blue-200' 
-                          : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
-                      }`}
+                      className={`flex items-center gap-1.5 px-3 py-1 ${isEditingForm ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-600 hover:bg-slate-700'} text-white text-[10px] font-bold rounded-lg transition-all shadow-md shadow-slate-100`}
                     >
-                      <Settings2 className="w-3.5 h-3.5" />
-                      {isEditingForm ? 'Xong' : 'Chỉnh sửa'}
+                      <Settings2 className="w-3 h-3" />
+                      {isEditingForm ? 'Lưu mẫu' : 'Chỉnh sửa mẫu'}
+                    </button>
+                    <button 
+                      onClick={() => window.print()}
+                      className="flex items-center gap-1.5 px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-lg hover:bg-blue-700 transition-all shadow-md shadow-blue-100"
+                    >
+                      <Download className="w-3 h-3" />
+                      In mẫu
                     </button>
                     <button 
                       onClick={handlePreviewPDF}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-700 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-50 transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1 bg-green-600 text-white text-[10px] font-bold rounded-lg hover:bg-green-700 transition-all shadow-md shadow-green-100"
                     >
-                      <Eye className="w-3.5 h-3.5" />
-                      Xem PDF
+                      <Eye className="w-3 h-3" />
+                      Xem trước
                     </button>
                     <button 
                       onClick={handleDownloadPDF}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-md shadow-blue-200 transition-all"
+                      className="flex items-center gap-1.5 px-3 py-1 bg-red-600 text-white text-[10px] font-bold rounded-lg hover:bg-red-700 transition-all shadow-md shadow-red-100"
                     >
-                      <Download className="w-3.5 h-3.5" />
+                      <FileText className="w-3 h-3" />
                       Tải PDF
                     </button>
                     <button 
                       onClick={() => setShowMedicalForm(false)}
-                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-all"
+                      className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                <div id="medical-form-to-print" className="print:p-0 print:border-0 print:shadow-none">
-                  {/* PAGE 1: MEDICAL EXAMINATION SUMMARY */}
-                  <div className="bg-white border border-slate-300 p-[10mm] shadow-inner mx-auto mb-10 print:mb-0 print:border-0 print:shadow-none relative overflow-hidden" style={{ width: '210mm', height: '296.5mm', fontFamily: '"Times New Roman", Times, serif', color: '#000' }}>
-                  {/* Official Header */}
-                  <div className="flex items-start mb-6">
-                    {/* Left: Logo & Number */}
-                    <div className="text-center w-[140px] flex-shrink-0">
-                      <div className="flex flex-col items-center gap-1 mb-1 mt-0">
-                        {customLogo ? (
-                          <img src={customLogo} alt="Logo" className="max-w-[130px] max-h-[60px] w-auto h-auto pl-[6px] object-contain -mt-[7px]" referrerPolicy="no-referrer" />
-                        ) : selectedLogo ? (
-                          <img src={selectedLogo} alt="Logo" className="max-w-[130px] max-h-[60px] w-auto h-auto pl-[6px] object-contain -mt-[7px]" referrerPolicy="no-referrer" />
-                        ) : globalLogo ? (
-                          <img src={globalLogo} alt="Logo" className="max-w-[130px] max-h-[60px] w-auto h-auto pl-[6px] object-contain -mt-[7px]" referrerPolicy="no-referrer" />
-                        ) : (
-                          <div className="w-[130px] h-[60px] pl-[6px] bg-blue-600 rounded flex items-center justify-center text-white font-bold text-xl -mt-[7px]">MP</div>
-                        )}
+                {/* The Form Content (Matching PDF Page 1) */}
+                <div id="medical-form-to-print" className="mx-auto print:p-0 print:border-0 print:shadow-none" style={{ width: '210mm', fontFamily: '"Times New Roman", Times, serif', color: '#000' }}>
+                  {/* Page 1: TÓM TẮT KẾT QUẢ KHÁM SỨC KHỎE */}
+                  <div className="bg-white border border-slate-300 p-[10mm] shadow-inner relative overflow-hidden print:border-0 print:shadow-none" style={{ width: '210mm', height: '297mm' }}>
+                    {/* Official Header */}
+                    <div className="flex items-start mb-6">
+                      {/* Left: Logo & Number */}
+                      <div className="text-center w-[140px] flex-shrink-0">
+                        <div className="flex flex-col items-center gap-1 mb-1 mt-0">
+                          {customLogo ? (
+                            <img src={customLogo} alt="Logo" className="max-w-[130px] max-h-[60px] w-auto h-auto pl-[6px] object-contain -mt-[7px]" referrerPolicy="no-referrer" />
+                          ) : selectedLogo ? (
+                            <img src={selectedLogo} alt="Logo" className="max-w-[130px] max-h-[60px] w-auto h-auto pl-[6px] object-contain -mt-[7px]" referrerPolicy="no-referrer" />
+                          ) : globalLogo ? (
+                            <img src={globalLogo} alt="Logo" className="max-w-[130px] max-h-[60px] w-auto h-auto pl-[6px] object-contain -mt-[7px]" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className="w-[130px] h-[60px] pl-[6px] bg-blue-600 rounded flex items-center justify-center text-white font-bold text-xl -mt-[7px]">MP</div>
+                          )}
+                        </div>
+                        <p className="text-[10pt] -mt-[11px]">Số: .........../KHTH</p>
                       </div>
-                      <p className="text-[10pt] -mt-[11px]">Số: .........../KHTH</p>
-                    </div>
 
-                    {/* Right: Title Section */}
-                    <div className="flex-1 text-center">
-                      <h1 className="text-[18pt] font-bold uppercase leading-tight">TÓM TẮT KẾT QUẢ KHÁM SỨC KHỎE</h1>
-                      <p className="text-[12pt] font-bold uppercase mt-1">(Dùng cho người đi lao động, học tập và công tác nước ngoài)</p>
-                      <p className="italic text-[10pt] mt-1">(Bản lưu tại Bệnh viện)</p>
-                    </div>
-                  </div>
-
-                  {/* Photo Box 4x6 (Positioned below Logo/Số) */}
-                  <div className="absolute border border-black flex items-center justify-center text-center text-[10pt] pl-2 pr-2 -ml-[25px] -mt-[53px] mb-0 mr-0 pt-2 h-[188.994px] w-[136px]" style={{ top: '40mm', left: '20mm' }}>
-                    Ảnh 4x6
-                  </div>
-
-                  <div className="flex flex-wrap gap-y-1 text-[12pt] mb-6 w-[560px] pl-0 pt-0 -mt-[22px] ml-[160px]">
-                    <DndContext 
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEndFields}
-                    >
-                      <SortableContext 
-                        items={formFields.map(f => f.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        {formFields.map((field) => (
-                          <SortableFormField 
-                            key={field.id}
-                            field={field}
-                            isEditing={isEditingForm}
-                            onRemove={() => removeFormField(field.id)}
-                            onUpdate={(updates) => updateFormField(field.id, updates)}
-                            selectedPersonIndex={selectedPersonIndex}
-                            results={results}
-                          />
-                        ))}
-                      </SortableContext>
-                    </DndContext>
-                    
-                    {isEditingForm && (
-                      <button 
-                        onClick={addFormField}
-                        className="flex items-center gap-1 text-blue-600 text-[10pt] font-bold hover:text-blue-700 transition-colors mt-2"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Thêm trường thông tin
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="relative">
-                    <DndContext 
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEndRows}
-                    >
-                      <table className="w-full border-collapse border border-black text-[9pt] mt-1 pt-0">
-                        <thead>
-                          <tr className="bg-slate-50">
-                            <th className="border border-black py-2 px-1 w-8 text-center align-middle">TT</th>
-                            <th className="border border-black py-2 px-1 w-[35%] text-center align-middle">NỘI DUNG KHÁM</th>
-                            <th className="border border-black py-2 px-1 text-center align-middle">KẾT QUẢ</th>
-                            <th className="border border-black py-2 px-1 w-24 text-center align-middle">BS KHÁM KÝ</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <SortableContext 
-                            items={tableRows.map(r => r.id)}
-                            strategy={verticalListSortingStrategy}
-                          >
-                            {tableRows.map((row) => (
-                              <SortableTableRow 
-                                key={row.id}
-                                row={row}
-                                isEditing={isEditingForm}
-                                onRemove={() => removeTableRow(row.id)}
-                                onUpdate={(updates) => updateTableRow(row.id, updates)}
-                              />
-                            ))}
-                          </SortableContext>
-                        </tbody>
-                      </table>
-                    </DndContext>
-                    
-                    {isEditingForm && (
-                      <button 
-                        onClick={addTableRow}
-                        className="flex items-center gap-1 text-blue-600 text-[10pt] font-bold hover:text-blue-700 transition-colors mt-2"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Thêm hàng mới
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="mt-6 text-[12pt] space-y-6 form-section">
-                    <div>
-                      <p className="font-bold -mt-3">KẾT LUẬN: <span className="font-normal italic">Đủ sức khỏe / Không đủ sức khỏe để làm việc.</span></p>
-                      <p className="mt-2 flex items-baseline gap-2">Lý do (nếu không đủ): <span className="border-b border-dotted border-black flex-1 relative top-[5px]">&nbsp;</span></p>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 mt-12 signature-block">
-                      <div className="text-center">
-                        <p className="font-bold uppercase mb-20">GIÁM ĐỐC BỆNH VIỆN</p>
-                        <p className="font-bold">(Ký tên, đóng dấu)</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="italic mb-2">Hà Nội, ngày ....... tháng ....... năm .......</p>
-                        <p className="font-bold uppercase mb-20">KT. TRƯỞNG PHÒNG KHTH</p>
-                        <p className="font-bold flex items-baseline gap-2 justify-center">BS. <span className="border-b border-dotted border-black w-40 relative top-[5px]">&nbsp;</span></p>
+                      {/* Right: Title Section */}
+                      <div className="flex-1 text-center">
+                        <h1 className="text-[16pt] font-bold uppercase leading-tight">TÓM TẮT KẾT QUẢ KHÁM SỨC KHỎE CỦA NGƯỜI ĐI LAO ĐỘNG, HỌC TẬP VÀ CÔNG TÁC NƯỚC NGOÀI</h1>
+                        <p className="text-[12pt] font-bold uppercase mt-1">MẪU SONG NGỮ</p>
+                        <p className="italic text-[10pt] mt-1">Bản lưu tại BV ĐHYD</p>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* PAGE 2: ECG RESULT FORM */}
-                  <div className="html2pdf__page-break" />
-                  <div className="bg-white border border-slate-300 p-[10mm] shadow-inner mx-auto print:border-0 print:shadow-none relative overflow-hidden" style={{ width: '210mm', height: '296.5mm', fontFamily: '"Times New Roman", Times, serif', color: '#000' }}>
+                    {/* Photo Box 4x6 (Positioned below Logo/Số) */}
+                    <div className="absolute border border-black flex items-center justify-center text-center text-[10pt] pl-2 pr-2 -ml-[25px] -mt-[53px] mb-0 mr-0 pt-2 h-[188.994px] w-[136px]" style={{ top: '40mm', left: '20mm' }}>
+                      Ảnh 4x6
+                    </div>
+
+                    <div className="flex flex-wrap gap-y-1 text-[12pt] mb-6 w-[560px] pl-0 pt-0 -mt-[22px] ml-[160px]">
+                      <DndContext 
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEndFields}
+                      >
+                        <SortableContext 
+                          items={formFields.map(f => f.id)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          {formFields.map((field) => (
+                            <SortableFormField 
+                              key={field.id}
+                              field={field}
+                              isEditing={isEditingForm}
+                              onRemove={() => removeFormField(field.id)}
+                              onUpdate={(updates) => updateFormField(field.id, updates)}
+                              selectedPersonIndex={selectedPersonIndex}
+                              results={results}
+                            />
+                          ))}
+                        </SortableContext>
+                      </DndContext>
+                      
+                      {isEditingForm && (
+                        <button 
+                          onClick={addFormField}
+                          className="flex items-center gap-1 text-blue-600 text-[10pt] font-bold hover:text-blue-700 transition-colors mt-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Thêm trường thông tin
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <DndContext 
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEndRows}
+                      >
+                        <table className="w-full border-collapse border border-black text-[9pt] mt-1 pt-0">
+                          <thead>
+                            <tr className="bg-slate-50">
+                              <th className="border border-black py-2 px-1 w-8 text-center align-middle">TT</th>
+                              <th className="border border-black py-2 px-1 w-[35%] text-center align-middle">NỘI DUNG KHÁM</th>
+                              <th className="border border-black py-2 px-1 text-center align-middle">KẾT QUẢ</th>
+                              <th className="border border-black py-2 px-1 w-24 text-center align-middle">BS KHÁM KÝ</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <SortableContext 
+                              items={tableRows.map(r => r.id)}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              {tableRows.map((row) => (
+                                <SortableTableRow 
+                                  key={row.id}
+                                  row={row}
+                                  isEditing={isEditingForm}
+                                  onRemove={() => removeTableRow(row.id)}
+                                  onUpdate={(updates) => updateTableRow(row.id, updates)}
+                                />
+                              ))}
+                            </SortableContext>
+                          </tbody>
+                        </table>
+                      </DndContext>
+                      
+                      {isEditingForm && (
+                        <button 
+                          onClick={addTableRow}
+                          className="flex items-center gap-1 text-blue-600 text-[10pt] font-bold hover:text-blue-700 transition-colors mt-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Thêm hàng mới
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="mt-4 text-[12pt] space-y-4">
+                      <div>
+                        <p className="font-bold -mt-2">KẾT LUẬN: <span className="font-normal italic">Người lao động này đủ/không đủ sức khỏe để làm việc (Nếu không đủ xin nêu lý do)</span></p>
+                        <p className="mt-1 flex items-baseline gap-2">Chi tiết lý do: <span className="border-b border-dotted border-black flex-1 pb-[2px]">......................................................................................................</span></p>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 mt-8">
+                        <div className="text-center">
+                          <p className="font-bold uppercase mb-16">GIÁM ĐỐC BỆNH VIỆN</p>
+                          <p className="font-bold">(Ký tên, đóng dấu)</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="italic mb-1">BẮC NINH, Ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+                          <p className="font-bold uppercase mb-16">KT. TRƯỞNG PHÒNG KHTH</p>
+                          <p className="font-bold flex items-baseline gap-2 justify-center">BS. <span className="border-b border-dotted border-black w-40 pb-[2px]">&nbsp;</span></p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Page 2: PHIẾU KẾT QUẢ ĐIỆN TIM (ECG) */}
+                  <div className="bg-white border border-slate-300 p-[10mm] shadow-inner relative overflow-hidden print:border-0 print:shadow-none mt-4 print:mt-0" style={{ width: '210mm', height: '297mm', pageBreakBefore: 'always' }}>
+                    {/* ECG Header */}
                     <div className="flex justify-between items-start mb-8">
-                      <div className="text-center w-[140px]">
-                        {customLogo ? (
-                          <img src={customLogo} alt="Logo" className="max-w-[130px] max-h-[60px] w-auto h-auto pl-[6px] object-contain mb-1" referrerPolicy="no-referrer" />
-                        ) : selectedLogo ? (
-                          <img src={selectedLogo} alt="Logo" className="max-w-[130px] max-h-[60px] w-auto h-auto pl-[6px] object-contain mb-1" referrerPolicy="no-referrer" />
-                        ) : globalLogo ? (
-                          <img src={globalLogo} alt="Logo" className="max-w-[130px] max-h-[60px] w-auto h-auto pl-[6px] object-contain mb-1" referrerPolicy="no-referrer" />
-                        ) : (
-                          <div className="w-[130px] h-[60px] pl-[6px] bg-blue-600 rounded flex items-center justify-center text-white font-bold text-xl mb-1">MP</div>
-                        )}
-                        <p className="font-bold text-[9pt] uppercase leading-tight">MPUH BỆNH VIỆN ĐẠI HỌC Y DƯỢC</p>
+                      <div className="text-left">
+                        <p className="font-bold text-[11pt] uppercase">MPUH BỆNH VIỆN ĐẠI HỌC Y DƯỢC</p>
                       </div>
-                      <div className="text-center flex-1">
-                        <p className="font-bold text-[11pt] uppercase">CỘNG HÀA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
-                        <p className="font-bold text-[11pt]">Độc lập - Tự do - Hạnh phúc</p>
+                      <div className="text-center">
+                        <p className="font-bold text-[11pt] uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                        <p className="font-bold text-[10pt]">Độc lập - Tự do - Hạnh phúc</p>
                         <div className="w-32 h-[1px] bg-black mx-auto mt-1"></div>
                       </div>
                     </div>
 
-                    <div className="text-center mb-10">
-                      <h1 className="text-[18pt] font-bold uppercase">PHIẾU KẾT QUẢ ĐIỆN TIM (ECG)</h1>
+                    <div className="text-center mb-8">
+                      <h2 className="text-[16pt] font-bold uppercase">PHIẾU KẾT QUẢ ĐIỆN TIM (ECG)</h2>
                     </div>
 
-                    <div className="space-y-4 text-[12pt] mb-10">
-                      <p className="flex items-baseline gap-2">
-                        <span className="font-bold whitespace-nowrap">Họ và tên:</span>
-                        <span className="border-b border-dotted border-black flex-1 uppercase font-bold text-blue-800 px-2 pb-[2px]">
-                          {selectedPersonIndex !== null ? results[selectedPersonIndex].fullName.toUpperCase() : '\u00A0'}
+                    {/* ECG Patient Info */}
+                    <div className="space-y-2 mb-6 text-[12pt]">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-bold whitespace-nowrap">Họ và tên (Full name):</span>
+                        <span className="border-b border-dotted border-black flex-1 px-2 uppercase font-bold text-blue-800">
+                          {selectedPersonIndex !== null ? results[selectedPersonIndex].fullName : '..................................................................'}
                         </span>
-                        <span className="font-bold whitespace-nowrap ml-4">Giới tính:</span>
-                        <span className="border-b border-dotted border-black w-24 px-2 pb-[2px]">
-                          {selectedPersonIndex !== null ? (results[selectedPersonIndex].gender || 'Nam') : 'Nam'}
+                        <span className="font-bold whitespace-nowrap ml-4">Giới tính (Sex):</span>
+                        <span className="border-b border-dotted border-black w-20 px-2">
+                          {selectedPersonIndex !== null ? results[selectedPersonIndex].gender : 'Nam'}
                         </span>
-                      </p>
-                      <p className="flex items-baseline gap-2">
-                        <span className="font-bold whitespace-nowrap">Ngày sinh:</span>
-                        <span className="border-b border-dotted border-black flex-1 px-2 pb-[2px]">
-                          {selectedPersonIndex !== null ? results[selectedPersonIndex].dateOfBirth : '\u00A0'}
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-bold whitespace-nowrap">Ngày sinh (Date of birth):</span>
+                        <span className="border-b border-dotted border-black flex-1 px-2">
+                          {selectedPersonIndex !== null ? results[selectedPersonIndex].dateOfBirth : '..................................................................'}
                         </span>
-                      </p>
-                      <p className="flex items-baseline gap-2">
-                        <span className="font-bold whitespace-nowrap">Địa chỉ:</span>
-                        <span className="border-b border-dotted border-black flex-1 px-2 pb-[2px]">
-                          {selectedPersonIndex !== null ? results[selectedPersonIndex].permanentResidence : '\u00A0'}
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-bold whitespace-nowrap">Địa chỉ (Address):</span>
+                        <span className="border-b border-dotted border-black flex-1 px-2">
+                          {selectedPersonIndex !== null ? results[selectedPersonIndex].permanentResidence : '..................................................................'}
                         </span>
-                      </p>
+                      </div>
                     </div>
 
-                    <table className="w-full border-collapse border border-black text-[12pt] mb-10">
+                    {/* ECG Table */}
+                    <table className="w-full border-collapse border border-black text-[11pt] mb-8">
                       <thead>
                         <tr className="bg-slate-50">
-                          <th className="border border-black py-3 px-4 text-left w-1/2">NỘI DUNG KHÁM</th>
-                          <th className="border border-black py-3 px-4 text-center">KẾT QUẢ</th>
+                          <th className="border border-black py-2 px-4 text-left w-1/2">DỊCH VỤ KHÁM (Examination services)</th>
+                          <th className="border border-black py-2 px-4 text-center">KẾT QUẢ (Result)</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td className="border border-black py-6 px-4 font-bold">1. Điện tim</td>
-                          <td className="border border-black py-6 px-4"></td>
+                          <td className="border border-black py-4 px-4 font-bold">1. Điện tim</td>
+                          <td className="border border-black py-4 px-4 italic text-center">
+                            {isEditingForm ? (
+                              <input 
+                                type="text" 
+                                placeholder="Nhập kết quả..."
+                                className="w-full bg-transparent border-b border-blue-200 focus:outline-none text-center"
+                              />
+                            ) : 'Bình thường / Normal'}
+                          </td>
                         </tr>
                       </tbody>
                     </table>
 
-                    <div className="text-[12pt] mb-16">
-                      <p className="font-bold mb-3 text-blue-900">Nhận xét của bác sĩ:</p>
-                      <div className="space-y-6">
-                        <p className="border-b border-dotted border-black h-6"></p>
-                        <p className="border-b border-dotted border-black h-6"></p>
-                        <p className="border-b border-dotted border-black h-6"></p>
-                        <p className="border-b border-dotted border-black h-6"></p>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end text-[12pt] signature-block">
-                      <div className="text-center w-72">
-                        <p className="italic mb-2">Ngày {new Date().toLocaleDateString('vi-VN').split('/')[0]} tháng {new Date().toLocaleDateString('vi-VN').split('/')[1]} năm {new Date().toLocaleDateString('vi-VN').split('/')[2]}</p>
-                        <p className="font-bold uppercase mb-28">Doctor</p>
-                        <p className="font-bold flex items-baseline gap-2 justify-center">BS. <span className="border-b border-dotted border-black w-44">&nbsp;</span></p>
+                    {/* ECG Footer */}
+                    <div className="mt-6 text-[12pt]">
+                      <p className="font-bold mb-2">Nhận xét khác của bác sĩ (Doctor's other comments):</p>
+                      <p className="border-b border-dotted border-black w-full pb-1">&nbsp;</p>
+                      <p className="border-b border-dotted border-black w-full pb-1 mt-2">&nbsp;</p>
+                      
+                      <div className="flex justify-end mt-10">
+                        <div className="text-center w-64">
+                          <p className="italic mb-2">Ngày (Date) 10/04/2026</p>
+                          <p className="font-bold uppercase mb-20">Bác sĩ (Doctor)</p>
+                          <p className="font-bold">................................................</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2195,13 +2192,13 @@ function SortableFormField({
 
   const displayValue = field.valueKey && selectedPersonIndex !== null 
     ? results[selectedPersonIndex][field.valueKey as keyof CCCDInfo] 
-    : "";
+    : field.defaultValue || "";
 
   return (
     <div 
       ref={setNodeRef} 
       className={`flex items-baseline gap-2 group relative ${isEditing ? 'hover:bg-blue-50/50 rounded p-1 -m-1' : ''}`}
-      style={{ ...style, height: '24px', width: field.width || '100%' }}
+      style={{ ...style, minHeight: '24px', width: field.width || '100%' }}
     >
       {isEditing && (
         <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-slate-300 hover:text-blue-500">
@@ -2210,20 +2207,30 @@ function SortableFormField({
       )}
       
       {isEditing ? (
-        <input 
-          type="text" 
-          value={field.label} 
-          onChange={(e) => onUpdate({ label: e.target.value })}
-          className="font-bold whitespace-nowrap bg-transparent border-b border-blue-200 focus:outline-none focus:border-blue-500 text-[12pt]"
-          style={{ width: 'auto', minWidth: '100px' }}
-        />
+        <div className="flex items-baseline gap-2 flex-1">
+          <input 
+            type="text" 
+            value={field.label} 
+            onChange={(e) => onUpdate({ label: e.target.value })}
+            className="font-bold whitespace-nowrap bg-transparent border-b border-blue-200 focus:outline-none focus:border-blue-500 text-[12pt]"
+            style={{ width: 'auto', minWidth: '100px' }}
+          />
+          <input 
+            type="text" 
+            value={field.defaultValue || displayValue} 
+            onChange={(e) => onUpdate({ defaultValue: e.target.value })}
+            placeholder="Giá trị..."
+            className="flex-1 bg-transparent border-b border-blue-200 focus:outline-none focus:border-blue-500 text-[12pt] px-2"
+          />
+        </div>
       ) : (
-        <span className={`${field.isBold ? 'font-bold' : ''} whitespace-nowrap`}>{field.label}</span>
+        <>
+          <span className={`${field.isBold ? 'font-bold' : ''} whitespace-nowrap`}>{field.label}</span>
+          <span className={`border-b border-dotted border-black flex-1 px-2 pb-[2px] ${field.uppercase ? 'uppercase' : ''} ${field.valueKey === 'fullName' ? 'text-blue-800 font-bold text-[13pt]' : ''}`}>
+            {displayValue || '\u00A0'}
+          </span>
+        </>
       )}
-
-      <span className={`border-b border-dotted border-black flex-1 px-2 pb-[2px] ${field.uppercase ? 'uppercase' : ''} ${field.valueKey === 'fullName' ? 'text-blue-800 font-bold text-[13pt]' : ''}`}>
-        {displayValue || '\u00A0'}
-      </span>
 
       {isEditing && (
         <button 
@@ -2301,7 +2308,7 @@ function SortableTableRow({
           />
         ) : row.label}
       </td>
-      <td className="border border-black py-2 px-1 italic text-slate-400 whitespace-nowrap align-middle">
+      <td className="border border-black py-2 px-1 italic text-slate-400 whitespace-pre-line align-middle">
         {isEditing ? (
           <input 
             type="text" 
